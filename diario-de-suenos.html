@@ -83,6 +83,12 @@
   .card h3 { margin: 0 0 10px; font-size: 0.95rem; color: var(--text-sec); font-weight: 600; }
   .hint { color: var(--muted); font-size: 0.82rem; margin: 2px 0 14px; }
 
+  .card-consejo { border-left: 4px solid var(--blue); }
+  .card-consejo h2 { font-size: 1.15rem; }
+  .card-consejo ul { margin: 8px 0; padding-left: 20px; }
+  .card-consejo li { margin-bottom: 5px; font-size: 0.92rem; }
+  .card-contexto summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; }
+
   label.field-label { display:block; font-size: 0.82rem; color: var(--text-sec); margin-bottom: 4px; font-weight: 600; }
   .field { margin-bottom: 14px; }
   .row { display: flex; gap: 14px; flex-wrap: wrap; }
@@ -221,6 +227,31 @@
   <!-- TAB: NUEVO SUEÑO -->
   <section class="tab-panel active" id="tab-nuevo">
     <div id="banner-constancia"></div>
+
+    <div class="card card-consejo">
+      <h2>💡 Consejo antes de anotar tu sueño</h2>
+      <p>Cuanta más información cargues, mejor va a ser la interpretación que después le pidas a una IA. Algunas ideas:</p>
+      <ul>
+        <li>Describí el sueño con el mayor detalle posible: personas, lugares, objetos, sensaciones, cómo terminó.</li>
+        <li>Completá tu <strong>contexto personal</strong> más abajo (una sola vez) — la app lo va a incluir siempre que generes un prompt de interpretación.</li>
+        <li>Contá qué te pasó en los días previos en <strong>"Contexto reciente"</strong> (una película que viste, una discusión, algo que te preocupa) — muchas veces el sueño toma prestado algo de lo que vivimos despiertos.</li>
+      </ul>
+      <p class="hint" style="margin-top:10px;">Nada de esto es obligatorio: podés cargar solo el relato y ya. Pero cuanto más contexto le des a la app, más precisa va a poder ser la lectura que te devuelva la IA después. Empecemos ↓</p>
+    </div>
+
+    <div class="card card-contexto">
+      <details id="detalle-contexto-personal">
+        <summary>🧭 Mi contexto personal (opcional — se guarda una sola vez y se usa siempre)</summary>
+        <p class="hint" style="margin-top:10px;">Es una breve descripción de quién sos: algo que te define o te marcó de forma duradera, no algo pasajero. Por ejemplo: tu edad, si tenés hijos, cómo es tu familia, tu relación con tus padres o tu pareja, una pérdida que todavía te atraviesa. Se guarda una sola vez y se suma automáticamente al prompt de interpretación de todos tus sueños — por eso tiene que ser algo que siga siendo cierto dentro de varios meses.</p>
+        <p class="hint" style="margin-top:6px;"><strong>Ejemplo de lo que NO va acá:</strong> "esta semana duermo mal" o "estoy estresado por un examen" — eso es pasajero y va en el campo "Contexto reciente" de cada sueño, no en este cajón permanente.</p>
+        <textarea id="campo-contexto-personal" rows="4" placeholder="Ej: Tengo 34 años, tengo dos hijos, mi relación con mi padre siempre fue distante, hace tres años perdí a mi madre y todavía me atraviesa..."></textarea>
+        <div class="btn-row" style="margin-top:8px;">
+          <button type="button" class="btn secondary small" id="btn-guardar-contexto-personal">Guardar contexto</button>
+          <span class="hint" id="msg-contexto-personal-guardado" style="display:none; align-self:center; margin:0;">Guardado ✓</span>
+        </div>
+      </details>
+    </div>
+
     <div class="card">
       <h2 id="form-titulo">Anotar un sueño nuevo</h2>
       <p class="hint" id="form-editando-hint" style="display:none;">Estás editando un sueño existente.</p>
@@ -310,6 +341,14 @@
           <input type="text" class="tag-input" id="input-simbolos" placeholder="Escribí un símbolo u objeto y presioná Enter">
           <p class="hint" id="hint-diccionario-simbolo" style="display:none; margin:6px 0 0;"></p>
           <div id="sugerencias-simbolos-relato" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="field" id="campo-contexto-wrap">
+          <label class="field-label">Contexto reciente (opcional)</label>
+          <div class="btn-row" style="margin:0 0 6px;">
+            <button type="button" class="btn secondary small" id="btn-dictar-contexto">🎤 Dictar por voz</button>
+          </div>
+          <textarea id="campo-contexto-reciente" rows="2" placeholder="¿Algo de los días previos que pudo influir? Una película, una discusión, algo que te preocupa..."></textarea>
         </div>
 
         <div class="field" id="campo-notas-wrap">
@@ -516,7 +555,7 @@
   function escapeForFile(s) { return s; }
 
   // ---------- Estado ----------
-  let state = { suenos: [], interpretaciones: [] };
+  let state = { suenos: [], interpretaciones: [], contextoPersonal: "" };
   let editingId = null;
   let formTags = { emociones: [], personas: [], lugares: [], simbolos: [] };
 
@@ -527,6 +566,7 @@
         const parsed = JSON.parse(raw);
         state.suenos = Array.isArray(parsed.suenos) ? parsed.suenos : [];
         state.interpretaciones = Array.isArray(parsed.interpretaciones) ? parsed.interpretaciones : [];
+        state.contextoPersonal = typeof parsed.contextoPersonal === "string" ? parsed.contextoPersonal : "";
       }
     } catch(e) { console.error("Error al cargar datos", e); }
   }
@@ -537,7 +577,7 @@
   // ---------- Navegación por pestañas ----------
   const tabButtons = document.querySelectorAll("nav.tabs button");
   tabButtons.forEach(btn => {
-    btn.addEventListener("click", () => activarTab(btn.dataset.tab));
+    btn.addEventListener("click", () => { idInterpretacionForzada = null; activarTab(btn.dataset.tab); });
   });
   function activarTab(tab) {
     tabButtons.forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
@@ -678,7 +718,8 @@
   // ---------- Selector rápido de emociones (emojis) ----------
   const EMOCIONES_EMOJI = [
     ["😨","miedo"], ["😊","alegría"], ["😰","ansiedad"], ["😌","calma"], ["😕","confusión"],
-    ["😢","tristeza"], ["😠","ira"], ["😲","sorpresa"], ["🥹","nostalgia"], ["🤩","euforia"]
+    ["😢","tristeza"], ["😠","ira"], ["😲","sorpresa"], ["😔","nostalgia"], ["🤩","euforia"],
+    ["😣","culpa"], ["😳","vergüenza"], ["🤔","curiosidad"], ["😮","asombro"]
   ];
   function renderEmojisEmociones() {
     const cont = document.getElementById("emojis-emociones");
@@ -697,7 +738,7 @@
 
   // ---------- Modo carga rápida ----------
   document.getElementById("check-carga-rapida").addEventListener("change", (e) => {
-    ["fila-claridad-intensidad","campo-personas-wrap","campo-lugares-wrap","campo-notas-wrap"].forEach(id => {
+    ["fila-claridad-intensidad","campo-personas-wrap","campo-lugares-wrap","campo-contexto-wrap","campo-notas-wrap"].forEach(id => {
       document.getElementById(id).classList.toggle("oculto-rapido", e.target.checked);
     });
   });
@@ -775,6 +816,27 @@
 
   document.getElementById("btn-cancelar-edicion").addEventListener("click", () => { resetForm(); });
 
+  function capitalizar(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+  function generarTituloAutomatico(s) {
+    let tema = "";
+    if (s.simbolos && s.simbolos.length) {
+      tema = s.simbolos.slice(0, 2).join(" y ");
+    } else if (s.lugares && s.lugares.length) {
+      tema = "en " + s.lugares[0];
+    } else if (s.personas && s.personas.length) {
+      tema = "con " + s.personas[0];
+    } else if (s.emociones && s.emociones.length) {
+      tema = s.emociones[0];
+    } else {
+      const claves = extraerPalabrasClave(s.texto || "", new Set(), 2);
+      if (claves.length) tema = claves.join(" y ");
+    }
+    if (!tema) return `Sueño del ${s.fecha}`;
+    if (/^(en|con) /.test(tema)) return capitalizar(`sueño ${tema}`);
+    return `Sueño con ${tema}`;
+  }
+
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const sueno = {
@@ -790,9 +852,11 @@
       personas: [...formTags.personas],
       lugares: [...formTags.lugares],
       simbolos: [...formTags.simbolos],
+      contextoReciente: document.getElementById("campo-contexto-reciente").value.trim(),
       notas: document.getElementById("campo-notas").value.trim(),
       interpretado: editingId ? !!(state.suenos.find(s=>s.id===editingId)||{}).interpretado : false
     };
+    if (!sueno.titulo) sueno.titulo = generarTituloAutomatico(sueno);
     if (editingId) {
       const idx = state.suenos.findIndex(s => s.id === editingId);
       if (idx !== -1) state.suenos[idx] = sueno;
@@ -811,7 +875,7 @@
     if (hasta && s.fecha > hasta) return false;
     if (texto) {
       const t = texto.toLowerCase();
-      const haystack = [s.titulo, s.texto, s.notas, ...(s.emociones||[]), ...(s.personas||[]), ...(s.lugares||[]), ...(s.simbolos||[])]
+      const haystack = [s.titulo, s.texto, s.notas, s.contextoReciente, ...(s.emociones||[]), ...(s.personas||[]), ...(s.lugares||[]), ...(s.simbolos||[])]
         .join(" ").toLowerCase();
       if (!haystack.includes(t)) return false;
     }
@@ -916,6 +980,7 @@
         "\n\n(Lecturas tradicionales de referencia, detectadas en las etiquetas y en el relato — no son un diagnóstico ni una verdad universal.)");
     }
     addDT("Fase lunar", faseLunarSimplificada(s.fecha).label);
+    addDT("Contexto reciente", s.contextoReciente);
     addDT("Relato", s.texto);
     addDT("Notas al despertar", s.notas);
 
@@ -933,6 +998,10 @@
     const btnEditar = document.createElement("button");
     btnEditar.className = "btn"; btnEditar.textContent = "Editar";
     btnEditar.addEventListener("click", () => { cerrarModal(); cargarParaEditar(s.id); });
+    const btnInterpretar = document.createElement("button");
+    btnInterpretar.className = "btn secondary";
+    btnInterpretar.textContent = sesiones.length ? "Agregar otra interpretación" : "Interpretar este sueño";
+    btnInterpretar.addEventListener("click", () => { cerrarModal(); abrirInterpretarParaSueno(s.id); });
     const btnEliminar = document.createElement("button");
     btnEliminar.className = "btn danger"; btnEliminar.textContent = "Eliminar";
     btnEliminar.addEventListener("click", () => {
@@ -946,7 +1015,7 @@
     const btnCerrar = document.createElement("button");
     btnCerrar.className = "btn secondary"; btnCerrar.textContent = "Cerrar";
     btnCerrar.addEventListener("click", cerrarModal);
-    btnRow.append(btnEditar, btnEliminar, btnCerrar);
+    btnRow.append(btnEditar, btnInterpretar, btnEliminar, btnCerrar);
 
     box.append(h2, dl, btnRow);
     overlay.style.display = "flex";
@@ -969,6 +1038,7 @@
     document.getElementById("val-claridad").textContent = String(s.claridad || 3);
     document.getElementById("campo-intensidad").value = s.intensidad || 3;
     document.getElementById("val-intensidad").textContent = String(s.intensidad || 3);
+    document.getElementById("campo-contexto-reciente").value = s.contextoReciente || "";
     document.getElementById("campo-notas").value = s.notas || "";
     formTags = {
       emociones: [...(s.emociones||[])],
@@ -982,7 +1052,7 @@
     document.getElementById("btn-guardar-sueno").textContent = "Guardar cambios";
     document.getElementById("btn-cancelar-edicion").style.display = "inline-block";
     document.getElementById("check-carga-rapida").checked = false;
-    ["fila-claridad-intensidad","campo-personas-wrap","campo-lugares-wrap","campo-notas-wrap"].forEach(id => {
+    ["fila-claridad-intensidad","campo-personas-wrap","campo-lugares-wrap","campo-contexto-wrap","campo-notas-wrap"].forEach(id => {
       document.getElementById(id).classList.remove("oculto-rapido");
     });
     document.getElementById("hint-diccionario-simbolo").style.display = "none";
@@ -1206,7 +1276,9 @@
 
   // ---------- Interpretar ----------
   const selectRango = document.getElementById("select-rango-interpretar");
+  let idInterpretacionForzada = null;
   selectRango.addEventListener("change", () => {
+    idInterpretacionForzada = null;
     document.getElementById("opciones-ultimos-dias").style.display = selectRango.value === "ultimos_dias" ? "flex" : "none";
     document.getElementById("opciones-rango-fechas").style.display = selectRango.value === "rango_fechas" ? "flex" : "none";
     actualizarPreviewSeleccion();
@@ -1216,6 +1288,9 @@
   document.getElementById("campo-rango-hasta").addEventListener("input", actualizarPreviewSeleccion);
 
   function suenosSeleccionados() {
+    if (idInterpretacionForzada) {
+      return state.suenos.filter(s => s.id === idInterpretacionForzada);
+    }
     const modo = selectRango.value;
     let lista = [...state.suenos];
     if (modo === "sin_interpretar") {
@@ -1235,8 +1310,13 @@
   }
 
   function actualizarPreviewSeleccion() {
-    const sel = suenosSeleccionados();
     const p = document.getElementById("preview-seleccion");
+    if (idInterpretacionForzada) {
+      const s = state.suenos.find(x => x.id === idInterpretacionForzada);
+      p.textContent = s ? `Vas a interpretar solo este sueño: ${s.fecha} — ${s.titulo || "(sin título)"}.` : "Ese sueño ya no existe.";
+      return;
+    }
+    const sel = suenosSeleccionados();
     p.textContent = sel.length
       ? `Se incluirán ${sel.length} sueño(s): ` + sel.map(s => s.fecha).join(", ")
       : "No hay sueños que coincidan con esta selección.";
@@ -1250,6 +1330,9 @@
     txt += "3. Ofrecer una interpretación reflexiva y respetuosa, sin afirmaciones absolutas ni alarmistas.\n";
     txt += "4. Sugerir 2 o 3 preguntas para que yo mismo siga explorando estos patrones.\n\n";
     txt += "Aclaración: esto es para autoconocimiento personal, no reemplaza terapia ni diagnóstico psicológico.\n\n";
+    if (state.contextoPersonal && state.contextoPersonal.trim()) {
+      txt += `Contexto personal sobre mí (dato de fondo, no es parte de un sueño puntual): ${state.contextoPersonal.trim()}\n\n`;
+    }
     txt += "--- Sueños ---\n\n";
     sel.forEach(s => {
       txt += `Fecha: ${s.fecha} — ${s.titulo || "(sin título)"}\n`;
@@ -1263,6 +1346,7 @@
         txt += `Lecturas simbólicas tradicionales de referencia, detectadas en las etiquetas o el relato (no las tomes como verdad cerrada): ${lecturasDetectadas.map(l => l.match.texto).join(" ")}\n`;
       }
       txt += `Relato: ${s.texto || "(sin relato)"}\n`;
+      if (s.contextoReciente) txt += `Contexto de los días previos a este sueño: ${s.contextoReciente}\n`;
       if (s.notas) txt += `Notas al despertar: ${s.notas}\n`;
       txt += "\n---\n\n";
     });
@@ -1270,13 +1354,20 @@
   }
 
   let seleccionActual = [];
-  document.getElementById("btn-generar-prompt").addEventListener("click", () => {
+  function generarYMostrarPrompt() {
     seleccionActual = suenosSeleccionados();
     if (!seleccionActual.length) { alert("No hay sueños que coincidan con esta selección."); return; }
     document.getElementById("prompt-generado").value = generarPrompt(seleccionActual);
     document.getElementById("bloque-prompt").style.display = "block";
     document.getElementById("bloque-respuesta").style.display = "block";
-  });
+  }
+  document.getElementById("btn-generar-prompt").addEventListener("click", generarYMostrarPrompt);
+
+  function abrirInterpretarParaSueno(id) {
+    idInterpretacionForzada = id;
+    activarTab("interpretar");
+    generarYMostrarPrompt();
+  }
   document.getElementById("btn-copiar-prompt").addEventListener("click", async () => {
     const ta = document.getElementById("prompt-generado");
     try {
@@ -1307,6 +1398,7 @@
       if (found) found.interpretado = true;
     });
     guardarEstado();
+    idInterpretacionForzada = null;
     document.getElementById("respuesta-ia").value = "";
     document.getElementById("bloque-prompt").style.display = "none";
     document.getElementById("bloque-respuesta").style.display = "none";
@@ -1381,6 +1473,9 @@
   document.getElementById("btn-exportar-md").addEventListener("click", () => {
     const ordenados = [...state.suenos].sort((a,b) => a.fecha.localeCompare(b.fecha));
     let md = `# Diario de Sueños\n\nExportado el ${new Date().toLocaleString("es-AR")}\n\n`;
+    if (state.contextoPersonal && state.contextoPersonal.trim()) {
+      md += `**Contexto personal:** ${state.contextoPersonal.trim()}\n\n---\n\n`;
+    }
     ordenados.forEach(s => {
       md += `## ${s.fecha} — ${s.titulo || "(sin título)"}\n\n`;
       md += `- Tipo: ${TIPO_LABELS[s.tipo] || s.tipo}\n- Claridad: ${s.claridad}/5\n- Intensidad emocional: ${s.intensidad}/5\n`;
@@ -1389,6 +1484,7 @@
       if (s.lugares && s.lugares.length) md += `- Lugares: ${s.lugares.join(", ")}\n`;
       if (s.simbolos && s.simbolos.length) md += `- Símbolos: ${s.simbolos.join(", ")}\n`;
       md += `\n${s.texto || ""}\n\n`;
+      if (s.contextoReciente) md += `**Contexto reciente:** ${s.contextoReciente}\n\n`;
       if (s.notas) md += `**Notas al despertar:** ${s.notas}\n\n`;
       md += "---\n\n";
     });
@@ -1415,12 +1511,15 @@
         if (reemplazar) {
           state.suenos = parsed.suenos;
           state.interpretaciones = Array.isArray(parsed.interpretaciones) ? parsed.interpretaciones : [];
+          if (typeof parsed.contextoPersonal === "string") state.contextoPersonal = parsed.contextoPersonal;
         } else {
           const idsExistentes = new Set(state.suenos.map(s => s.id));
           parsed.suenos.forEach(s => { if (!idsExistentes.has(s.id)) state.suenos.push(s); });
           const idsInterp = new Set(state.interpretaciones.map(i => i.id));
           (parsed.interpretaciones||[]).forEach(i => { if (!idsInterp.has(i.id)) state.interpretaciones.push(i); });
+          if (!state.contextoPersonal && typeof parsed.contextoPersonal === "string") state.contextoPersonal = parsed.contextoPersonal;
         }
+        document.getElementById("campo-contexto-personal").value = state.contextoPersonal || "";
         guardarEstado();
         renderBackup();
         renderLista();
@@ -1670,7 +1769,17 @@
     });
   }
   habilitarDictado("btn-dictar-texto", "campo-texto");
+  habilitarDictado("btn-dictar-contexto", "campo-contexto-reciente");
   habilitarDictado("btn-dictar-notas", "campo-notas");
+
+  // ---------- Contexto personal (perfil, se guarda una sola vez) ----------
+  document.getElementById("btn-guardar-contexto-personal").addEventListener("click", () => {
+    state.contextoPersonal = document.getElementById("campo-contexto-personal").value.trim();
+    guardarEstado();
+    const msg = document.getElementById("msg-contexto-personal-guardado");
+    msg.style.display = "inline";
+    setTimeout(() => { msg.style.display = "none"; }, 1800);
+  });
 
   // ---------- Banner de constancia ----------
   function renderBannerConstancia() {
@@ -1704,12 +1813,16 @@
       .notas{font-style:italic;color:#444;margin-top:8px;font-size:0.85rem;}
     </style></head><body>`;
     html += `<h1>Diario de Sueños</h1><p class="fecha-export">Exportado el ${escapeHtml(new Date().toLocaleString("es-AR"))} — ${ordenados.length} sueño(s)</p>`;
+    if (state.contextoPersonal && state.contextoPersonal.trim()) {
+      html += `<p class="notas"><strong>Contexto personal:</strong> ${escapeHtml(state.contextoPersonal.trim())}</p>`;
+    }
     ordenados.forEach(s => {
       html += `<div class="sueno"><h2>${escapeHtml(s.fecha)} — ${escapeHtml(s.titulo || "(sin título)")}</h2>`;
       html += `<div class="meta">${escapeHtml(TIPO_LABELS[s.tipo] || s.tipo)} · Claridad ${s.claridad}/5 · Intensidad ${s.intensidad}/5 · Fase lunar: ${escapeHtml(faseLunarSimplificada(s.fecha).label)}`;
       if ((s.emociones||[]).length) html += ` · Emociones: ${escapeHtml(s.emociones.join(", "))}`;
       if ((s.simbolos||[]).length) html += ` · Símbolos: ${escapeHtml(s.simbolos.join(", "))}`;
       html += `</div><div class="relato">${escapeHtml(s.texto || "")}</div>`;
+      if (s.contextoReciente) html += `<div class="notas">Contexto reciente: ${escapeHtml(s.contextoReciente)}</div>`;
       if (s.notas) html += `<div class="notas">Notas al despertar: ${escapeHtml(s.notas)}</div>`;
       html += `</div>`;
     });
@@ -1723,6 +1836,7 @@
   // ---------- Inicio ----------
   aplicarTemaGuardado();
   cargarEstado();
+  document.getElementById("campo-contexto-personal").value = state.contextoPersonal || "";
   resetForm();
   renderLista();
   renderBannerConstancia();
