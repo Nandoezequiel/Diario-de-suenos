@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diario de Sueños</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #fcfcfb;
+    --page: #f9f9f7;
+    --text: #0b0b0b;
+    --text-sec: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --blue:#2a78d6; --orange:#eb6834; --aqua:#1baf7a; --yellow:#eda100;
+    --magenta:#e87ba4; --green:#008300; --violet:#4a3aa7; --red:#e34948;
+    --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface:#1a1a19; --page:#0d0d0d; --text:#ffffff; --text-sec:#c3c2b7;
+      --muted:#898781; --grid:#2c2c2a; --axis:#383835; --border: rgba(255,255,255,0.10);
+      --blue:#3987e5; --orange:#d95926; --aqua:#199e70; --yellow:#c98500;
+      --magenta:#d55181; --green:#008300; --violet:#9085e9; --red:#e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface:#1a1a19; --page:#0d0d0d; --text:#ffffff; --text-sec:#c3c2b7;
+    --muted:#898781; --grid:#2c2c2a; --axis:#383835; --border: rgba(255,255,255,0.10);
+    --blue:#3987e5; --orange:#d95926; --aqua:#199e70; --yellow:#c98500;
+    --magenta:#d55181; --green:#008300; --violet:#9085e9; --red:#e66767;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--page);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  body { min-height: 100vh; }
+  .app { max-width: 980px; margin: 0 auto; padding: 16px 16px 64px; }
+
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; padding: 20px 4px 12px;
+  }
+  header.top h1 { font-size: 1.5rem; margin: 0; letter-spacing: -0.01em; }
+  header.top p.sub { margin: 2px 0 0; color: var(--text-sec); font-size: 0.9rem; }
+  .header-left { display:flex; flex-direction:column; }
+  .icon-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; width: 38px; height: 38px; font-size: 1.05rem; cursor: pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .icon-btn:hover { border-color: var(--muted); }
+
+  nav.tabs {
+    display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 20px;
+    border-bottom: 1px solid var(--border); padding-bottom: 10px;
+  }
+  nav.tabs button {
+    background: transparent; border: 1px solid transparent; color: var(--text-sec);
+    padding: 8px 14px; border-radius: 999px; font-size: 0.88rem; cursor: pointer;
+    font-family: inherit;
+  }
+  nav.tabs button:hover { background: var(--surface); }
+  nav.tabs button.active { background: var(--blue); color: #fff; font-weight: 600; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px 20px; margin-bottom: 16px;
+  }
+  .card h2 { margin: 0 0 4px; font-size: 1.05rem; }
+  .card h3 { margin: 0 0 10px; font-size: 0.95rem; color: var(--text-sec); font-weight: 600; }
+  .hint { color: var(--muted); font-size: 0.82rem; margin: 2px 0 14px; }
+
+  label.field-label { display:block; font-size: 0.82rem; color: var(--text-sec); margin-bottom: 4px; font-weight: 600; }
+  .field { margin-bottom: 14px; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .row > .field { flex: 1 1 160px; }
+
+  input[type=text], input[type=date], input[type=number], textarea, select {
+    width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--page); color: var(--text); font-family: inherit; font-size: 0.92rem;
+  }
+  textarea { resize: vertical; min-height: 90px; line-height: 1.4; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+  .range-field { display:flex; align-items:center; gap:10px; }
+  .range-field input[type=range] { flex:1; }
+  .range-val { min-width: 34px; text-align:center; font-weight:600; font-size:0.85rem;
+    background: var(--page); border:1px solid var(--border); border-radius:6px; padding:2px 6px; }
+
+  .tag-field .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom: 6px; min-height: 0; }
+  .chip {
+    display:inline-flex; align-items:center; gap:6px; background: var(--page);
+    border: 1px solid var(--border); padding: 4px 8px 4px 10px; border-radius: 999px; font-size: 0.82rem;
+  }
+  .chip button {
+    background:none; border:none; color: var(--muted); cursor:pointer; font-size: 0.95rem; line-height:1;
+    padding: 0 2px;
+  }
+  .chip button:hover { color: var(--red); }
+
+  .btn {
+    background: var(--blue); color: #fff; border: none; border-radius: 8px;
+    padding: 10px 18px; font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn.secondary { background: var(--page); color: var(--text); border: 1px solid var(--border); }
+  .btn.danger { background: var(--critical); }
+  .btn.small { padding: 6px 12px; font-size: 0.8rem; }
+  .btn-row { display:flex; gap:10px; flex-wrap:wrap; margin-top: 6px; }
+
+  .filters { display:flex; gap:10px; flex-wrap:wrap; margin-bottom: 16px; }
+  .filters > * { flex: 1 1 150px; }
+
+  .dream-card {
+    border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
+    background: var(--surface); cursor: pointer;
+  }
+  .dream-card:hover { border-color: var(--muted); }
+  .dream-card .top-row { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; }
+  .dream-card .fecha { color: var(--muted); font-size: 0.78rem; }
+  .dream-card h4 { margin: 2px 0 6px; font-size: 1rem; }
+  .dream-card p.excerpt { margin: 0 0 8px; color: var(--text-sec); font-size: 0.88rem; line-height:1.4; }
+  .badge {
+    display:inline-block; font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; color:#fff;
+  }
+  .chips-inline { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip-static {
+    font-size: 0.72rem; background: var(--page); border: 1px solid var(--border); color: var(--text-sec);
+    padding: 2px 8px; border-radius: 999px;
+  }
+  .chip-tag-btn {
+    font-size: 0.78rem; background: var(--page); border: 1px solid var(--border); color: var(--text);
+    padding: 5px 12px; border-radius: 999px; cursor: pointer; font-family: inherit;
+  }
+  .chip-tag-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .chip-tag-btn .count { color: var(--muted); font-size: 0.72rem; }
+  #btn-dictar-texto.grabando, #btn-dictar-notas.grabando {
+    background: var(--critical); color: #fff; border-color: var(--critical);
+  }
+  g.chart-clickable { cursor: pointer; }
+  .oculto-rapido { display: none !important; }
+  .emoji-btn {
+    font-size: 1.3rem; background: var(--page); border: 1px solid var(--border); border-radius: 10px;
+    padding: 6px 10px; cursor: pointer; line-height: 1;
+  }
+  .emoji-btn:hover { border-color: var(--blue); }
+  .sugerencia-chip {
+    font-size: 0.78rem; background: var(--page); border: 1px dashed var(--border); color: var(--text-sec);
+    padding: 5px 10px; border-radius: 999px; cursor: pointer; font-family: inherit; margin: 0 6px 6px 0;
+  }
+  .sugerencia-chip:hover { border-color: var(--aqua); color: var(--aqua); }
+  .empty-msg { color: var(--muted); font-size: 0.9rem; padding: 20px 4px; text-align:center; }
+
+  .stat-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom: 16px; }
+  .stat-tile { background: var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; }
+  .stat-tile .label { font-size: 0.78rem; color: var(--text-sec); margin-bottom: 4px; }
+  .stat-tile .value { font-size: 1.9rem; font-weight: 700; }
+
+  svg.chart { width: 100%; height: auto; display:block; }
+  .chart-wrap { margin-bottom: 8px; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45); display:flex;
+    align-items:center; justify-content:center; padding: 20px; z-index: 100;
+  }
+  .modal-box {
+    background: var(--surface); border-radius: 14px; max-width: 640px; width:100%;
+    max-height: 86vh; overflow-y:auto; padding: 24px 26px; border: 1px solid var(--border);
+  }
+  .modal-box dl { margin: 0; }
+  .modal-box dt { font-size: 0.76rem; color: var(--muted); margin-top: 10px; font-weight:600; text-transform:uppercase; letter-spacing:0.03em; }
+  .modal-box dd { margin: 2px 0 0; font-size: 0.92rem; white-space: pre-wrap; line-height:1.5; }
+
+  details.session { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; background: var(--surface); }
+  details.session summary { cursor:pointer; font-size: 0.88rem; font-weight:600; }
+  details.session .respuesta { white-space: pre-wrap; margin-top: 10px; font-size: 0.88rem; line-height:1.5; color: var(--text-sec); }
+
+  .banner {
+    background: var(--page); border: 1px solid var(--warning); border-left: 4px solid var(--warning);
+    border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; margin-bottom: 14px;
+  }
+  textarea#prompt-generado, textarea#respuesta-ia { font-size: 0.85rem; }
+  @media (max-width: 600px) {
+    .row > .field { flex: 1 1 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="header-left">
+      <h1>🌙 Diario de Sueños</h1>
+      <p class="sub">Registrá tus sueños, encontrá patrones con el tiempo.</p>
+    </div>
+    <button class="icon-btn" id="btn-tema" title="Cambiar tema claro/oscuro">🌓</button>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="nuevo" class="active">Nuevo sueño</button>
+    <button data-tab="lista">Mis sueños</button>
+    <button data-tab="mapa">Mapa personal</button>
+    <button data-tab="conexiones">Conexiones</button>
+    <button data-tab="interpretar">Interpretar</button>
+    <button data-tab="backup">Backup</button>
+  </nav>
+
+  <!-- TAB: NUEVO SUEÑO -->
+  <section class="tab-panel active" id="tab-nuevo">
+    <div id="banner-constancia"></div>
+    <div class="card">
+      <h2 id="form-titulo">Anotar un sueño nuevo</h2>
+      <p class="hint" id="form-editando-hint" style="display:none;">Estás editando un sueño existente.</p>
+      <div class="btn-row" style="margin-bottom:14px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; color:var(--text-sec); cursor:pointer;">
+          <input type="checkbox" id="check-carga-rapida"> ⚡ Modo carga rápida (menos campos, completar el resto después)
+        </label>
+      </div>
+      <form id="form-sueno">
+        <div class="row">
+          <div class="field">
+            <label class="field-label">Fecha del sueño</label>
+            <input type="date" id="campo-fecha" required>
+            <p class="hint" id="fase-lunar-form" style="margin:4px 0 0;"></p>
+          </div>
+          <div class="field">
+            <label class="field-label">Tipo de sueño</label>
+            <select id="campo-tipo">
+              <option value="normal">Normal</option>
+              <option value="lucido">Lúcido</option>
+              <option value="pesadilla">Pesadilla</option>
+              <option value="recurrente">Recurrente</option>
+              <option value="astral">Viaje astral</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Título breve</label>
+          <input type="text" id="campo-titulo" placeholder="Ej: El tren que nunca llegaba">
+        </div>
+
+        <div class="field">
+          <label class="field-label">Relato del sueño</label>
+          <div class="btn-row" style="margin:0 0 6px;">
+            <button type="button" class="btn secondary small" id="btn-dictar-texto">🎤 Dictar por voz</button>
+          </div>
+          <textarea id="campo-texto" rows="7" placeholder="Contá el sueño con el mayor detalle posible, como si se lo describieras a alguien..."></textarea>
+        </div>
+
+        <div class="row" id="fila-claridad-intensidad">
+          <div class="field">
+            <label class="field-label">Claridad del recuerdo</label>
+            <div class="range-field">
+              <input type="range" id="campo-claridad" min="1" max="5" value="3">
+              <span class="range-val" id="val-claridad">3</span>
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Intensidad emocional</label>
+            <div class="range-field">
+              <input type="range" id="campo-intensidad" min="1" max="5" value="3">
+              <span class="range-val" id="val-intensidad">3</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field tag-field" data-field="emociones">
+          <label class="field-label">Emociones</label>
+          <div class="chips-inline" id="emojis-emociones" style="margin-bottom:8px;"></div>
+          <div class="chips" id="chips-emociones"></div>
+          <input type="text" class="tag-input" id="input-emociones" placeholder="Escribí y presioná Enter (ej: miedo, calma, ansiedad...)" list="lista-emociones">
+          <datalist id="lista-emociones">
+            <option value="miedo"></option><option value="alegría"></option><option value="ansiedad"></option>
+            <option value="calma"></option><option value="confusión"></option><option value="tristeza"></option>
+            <option value="ira"></option><option value="sorpresa"></option><option value="nostalgia"></option>
+            <option value="euforia"></option><option value="culpa"></option><option value="vergüenza"></option>
+            <option value="curiosidad"></option><option value="asombro"></option>
+          </datalist>
+        </div>
+
+        <div class="field tag-field" data-field="personas" id="campo-personas-wrap">
+          <label class="field-label">Personas presentes</label>
+          <div class="chips" id="chips-personas"></div>
+          <input type="text" class="tag-input" id="input-personas" placeholder="Escribí un nombre y presioná Enter">
+        </div>
+
+        <div class="field tag-field" data-field="lugares" id="campo-lugares-wrap">
+          <label class="field-label">Lugares</label>
+          <div class="chips" id="chips-lugares"></div>
+          <input type="text" class="tag-input" id="input-lugares" placeholder="Escribí un lugar y presioná Enter">
+        </div>
+
+        <div class="field tag-field" data-field="simbolos">
+          <label class="field-label">Símbolos / objetos recurrentes</label>
+          <div class="chips" id="chips-simbolos"></div>
+          <input type="text" class="tag-input" id="input-simbolos" placeholder="Escribí un símbolo u objeto y presioná Enter">
+          <p class="hint" id="hint-diccionario-simbolo" style="display:none; margin:6px 0 0;"></p>
+          <div id="sugerencias-simbolos-relato" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="field" id="campo-notas-wrap">
+          <label class="field-label">Notas al despertar (opcional)</label>
+          <div class="btn-row" style="margin:0 0 6px;">
+            <button type="button" class="btn secondary small" id="btn-dictar-notas">🎤 Dictar por voz</button>
+          </div>
+          <textarea id="campo-notas" rows="2" placeholder="Cómo te sentiste al despertar, algo que te llamó la atención..."></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn" id="btn-guardar-sueno">Guardar sueño</button>
+          <button type="button" class="btn secondary" id="btn-cancelar-edicion" style="display:none;">Cancelar edición</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- TAB: LISTA -->
+  <section class="tab-panel" id="tab-lista">
+    <div class="card">
+      <div class="filters">
+        <input type="text" id="filtro-texto" placeholder="Buscar por título, texto o etiqueta...">
+        <select id="filtro-tipo">
+          <option value="">Todos los tipos</option>
+          <option value="normal">Normal</option>
+          <option value="lucido">Lúcido</option>
+          <option value="pesadilla">Pesadilla</option>
+          <option value="recurrente">Recurrente</option>
+          <option value="astral">Viaje astral</option>
+        </select>
+        <input type="date" id="filtro-desde" title="Desde">
+        <input type="date" id="filtro-hasta" title="Hasta">
+      </div>
+      <div id="lista-suenos"></div>
+    </div>
+  </section>
+
+  <!-- TAB: MAPA PERSONAL -->
+  <section class="tab-panel" id="tab-mapa">
+    <div class="stat-grid" id="stat-grid"></div>
+
+    <div class="card">
+      <h3>Constancia (último año)</h3>
+      <p class="hint">Cada cuadrito es un día. Cuanto más oscuro, más sueños anotaste ese día.</p>
+      <div class="chart-wrap" style="overflow-x:auto;"><svg class="chart" id="chart-heatmap"></svg></div>
+    </div>
+
+    <div class="card">
+      <h3>Sueños registrados por semana (últimas 12 semanas)</h3>
+      <div class="chart-wrap"><svg class="chart" id="chart-timeline" height="220"></svg></div>
+    </div>
+
+    <div class="card">
+      <h3>Tipos de sueño</h3>
+      <div class="chart-wrap"><svg class="chart" id="chart-tipos"></svg></div>
+    </div>
+
+    <div class="card">
+      <h3>Sueños por fase lunar</h3>
+      <p class="hint">Agrupado por la fase de la luna en la fecha de cada sueño.</p>
+      <div class="chart-wrap"><svg class="chart" id="chart-luna"></svg></div>
+    </div>
+
+    <div class="card">
+      <h3>Emociones más frecuentes</h3>
+      <div class="chart-wrap"><svg class="chart" id="chart-emociones"></svg></div>
+      <p class="hint" id="hint-emociones" style="display:none;">Todavía no hay suficientes datos.</p>
+    </div>
+
+    <div class="card">
+      <h3>Símbolos / objetos más frecuentes</h3>
+      <div class="chart-wrap"><svg class="chart" id="chart-simbolos"></svg></div>
+      <p class="hint" id="hint-simbolos" style="display:none;">Todavía no hay suficientes datos.</p>
+    </div>
+  </section>
+
+  <!-- TAB: CONEXIONES -->
+  <section class="tab-panel" id="tab-conexiones">
+    <div class="card">
+      <h2>Explorador de conexiones</h2>
+      <p class="hint">Elegí una emoción, persona, lugar o símbolo y mirá en qué otros sueños aparece, y con qué otras etiquetas suele venir junto.</p>
+      <div class="field">
+        <label class="field-label">Buscar etiqueta</label>
+        <input type="text" id="input-buscar-conexion" placeholder="Escribí una etiqueta y presioná Enter (ej: mar, mamá, casa...)">
+      </div>
+      <div class="field">
+        <label class="field-label">O elegí una de las más frecuentes</label>
+        <div class="chips-inline" id="chips-top-tags"></div>
+      </div>
+    </div>
+
+    <div class="card" id="card-resultado-conexion" style="display:none;">
+      <h3 id="titulo-resultado-conexion"></h3>
+      <div id="cooc-resultado-conexion" style="margin-bottom:14px;"></div>
+      <div id="lista-resultado-conexion"></div>
+    </div>
+  </section>
+
+  <!-- TAB: INTERPRETAR -->
+  <section class="tab-panel" id="tab-interpretar">
+    <div class="card">
+      <h2>Generar prompt para interpretar con IA</h2>
+      <p class="hint">Elegí qué sueños incluir. Se arma un texto listo para pegar en Claude (u otra IA) pidiendo una lectura reflexiva, no un diagnóstico.</p>
+
+      <div class="field">
+        <label class="field-label">¿Qué sueños incluir?</label>
+        <select id="select-rango-interpretar">
+          <option value="sin_interpretar">Sueños que todavía no interpreté</option>
+          <option value="ultimos_dias">Últimos N días</option>
+          <option value="rango_fechas">Rango de fechas</option>
+          <option value="todos">Todos los sueños</option>
+        </select>
+      </div>
+      <div class="row" id="opciones-ultimos-dias" style="display:none;">
+        <div class="field">
+          <label class="field-label">Cantidad de días</label>
+          <input type="number" id="campo-ultimos-dias" value="30" min="1">
+        </div>
+      </div>
+      <div class="row" id="opciones-rango-fechas" style="display:none;">
+        <div class="field">
+          <label class="field-label">Desde</label>
+          <input type="date" id="campo-rango-desde">
+        </div>
+        <div class="field">
+          <label class="field-label">Hasta</label>
+          <input type="date" id="campo-rango-hasta">
+        </div>
+      </div>
+
+      <p class="hint" id="preview-seleccion">—</p>
+
+      <div class="btn-row">
+        <button class="btn" id="btn-generar-prompt">Generar prompt</button>
+      </div>
+
+      <div class="field" id="bloque-prompt" style="margin-top:16px; display:none;">
+        <label class="field-label">Prompt generado</label>
+        <textarea id="prompt-generado" rows="10" readonly></textarea>
+        <div class="btn-row">
+          <button class="btn secondary" id="btn-copiar-prompt">Copiar al portapapeles</button>
+        </div>
+      </div>
+
+      <div class="field" id="bloque-respuesta" style="display:none;">
+        <label class="field-label">Pegá acá la interpretación que te dio la IA</label>
+        <textarea id="respuesta-ia" rows="8" placeholder="Pegá la respuesta acá para guardarla junto con estos sueños..."></textarea>
+        <div class="btn-row">
+          <button class="btn" id="btn-guardar-interpretacion">Guardar interpretación</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Historial de interpretaciones guardadas</h3>
+      <div id="historial-interpretaciones"></div>
+    </div>
+  </section>
+
+  <!-- TAB: BACKUP -->
+  <section class="tab-panel" id="tab-backup">
+    <div class="card">
+      <h2>Backup y exportación</h2>
+      <p class="hint">Los datos se guardan en este navegador (localStorage). Si cambiás de navegador, de PC, o el navegador borra sus datos, perdés lo que no hayas exportado. Recomendado: exportar seguido.</p>
+      <div id="banner-backup"></div>
+      <p style="font-size:0.85rem; color:var(--text-sec);" id="stats-backup"></p>
+      <h3 style="margin-top:18px;">Exportar</h3>
+      <div class="btn-row">
+        <button class="btn" id="btn-exportar-json">Exportar JSON (backup completo)</button>
+        <button class="btn secondary" id="btn-exportar-md">Exportar Markdown (lectura)</button>
+        <button class="btn secondary" id="btn-exportar-pdf">Exportar a PDF (imprimir)</button>
+      </div>
+      <h3 style="margin-top:22px;">Importar</h3>
+      <p class="hint">Restaurar o fusionar desde un archivo JSON exportado antes.</p>
+      <input type="file" id="input-importar-json" accept="application/json">
+    </div>
+  </section>
+
+</div>
+
+<div class="modal-overlay" id="modal-overlay" style="display:none;">
+  <div class="modal-box" id="modal-box"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const svgNS = "http://www.w3.org/2000/svg";
+  const STORAGE_KEY = "diario_suenos_data_v1";
+  const THEME_KEY = "diario_suenos_theme";
+  const BACKUP_KEY = "diario_suenos_ultimo_backup";
+
+  const TIPO_LABELS = { normal: "Normal", lucido: "Lúcido", pesadilla: "Pesadilla", recurrente: "Recurrente", astral: "Viaje astral" };
+  const TIPO_COLORVAR = { normal: "var(--blue)", lucido: "var(--yellow)", pesadilla: "var(--red)", recurrente: "var(--violet)", astral: "var(--magenta)" };
+
+  function uid() {
+    try { return crypto.randomUUID(); } catch(e) { return "id-" + Date.now() + "-" + Math.random().toString(36).slice(2); }
+  }
+  function todayStr() {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+  function escapeForFile(s) { return s; }
+
+  // ---------- Estado ----------
+  let state = { suenos: [], interpretaciones: [] };
+  let editingId = null;
+  let formTags = { emociones: [], personas: [], lugares: [], simbolos: [] };
+
+  function cargarEstado() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        state.suenos = Array.isArray(parsed.suenos) ? parsed.suenos : [];
+        state.interpretaciones = Array.isArray(parsed.interpretaciones) ? parsed.interpretaciones : [];
+      }
+    } catch(e) { console.error("Error al cargar datos", e); }
+  }
+  function guardarEstado() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  // ---------- Navegación por pestañas ----------
+  const tabButtons = document.querySelectorAll("nav.tabs button");
+  tabButtons.forEach(btn => {
+    btn.addEventListener("click", () => activarTab(btn.dataset.tab));
+  });
+  function activarTab(tab) {
+    tabButtons.forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    document.getElementById("tab-" + tab).classList.add("active");
+    if (tab === "nuevo") renderBannerConstancia();
+    if (tab === "lista") renderLista();
+    if (tab === "mapa") renderMapa();
+    if (tab === "conexiones") renderChipsTopTags();
+    if (tab === "interpretar") { actualizarPreviewSeleccion(); renderHistorialInterpretaciones(); }
+    if (tab === "backup") renderBackup();
+  }
+
+  // ---------- Tema ----------
+  const btnTema = document.getElementById("btn-tema");
+  function aplicarTemaGuardado() {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === "light" || saved === "dark") document.documentElement.setAttribute("data-theme", saved);
+  }
+  btnTema.addEventListener("click", () => {
+    const current = document.documentElement.getAttribute("data-theme");
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const currentlyDark = current ? current === "dark" : prefersDark;
+    const next = currentlyDark ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem(THEME_KEY, next);
+  });
+
+  // ---------- Tag inputs ----------
+  function renderChips(field) {
+    const cont = document.getElementById("chips-" + field);
+    cont.innerHTML = "";
+    formTags[field].forEach((tag, idx) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      const txt = document.createElement("span");
+      txt.textContent = tag;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "×";
+      btn.addEventListener("click", () => { formTags[field].splice(idx,1); renderChips(field); });
+      chip.append(txt, btn);
+      cont.appendChild(chip);
+    });
+  }
+  function addTag(field, value) {
+    const v = value.trim();
+    if (!v) return;
+    if (formTags[field].some(t => t.toLowerCase() === v.toLowerCase())) return;
+    formTags[field].push(v);
+    renderChips(field);
+  }
+  ["emociones","personas","lugares","simbolos"].forEach(field => {
+    const input = document.getElementById("input-" + field);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === ",") {
+        e.preventDefault();
+        addTag(field, input.value);
+        input.value = "";
+      } else if (e.key === "Backspace" && input.value === "" && formTags[field].length) {
+        formTags[field].pop();
+        renderChips(field);
+      }
+    });
+    input.addEventListener("blur", () => { if (input.value.trim()) { addTag(field, input.value); input.value = ""; } });
+  });
+
+  // ---------- Diccionario de símbolos ----------
+  const DICCIONARIO_SIMBOLOS = [
+    { claves: ["volar", "vuelo"], texto: "Suele asociarse a la sensación de libertad, tomar perspectiva o el deseo de escapar de una situación. Según el psicoanálisis freudiano, puede tener también una connotación sexual." },
+    { claves: ["perseguido", "persecucion", "perseguir"], texto: "Suele indicar que hay algo (una emoción, un problema) que se evita enfrentar en la vida despierta. Si quien persigue es un animal, puede representar ira o instintos reprimidos." },
+    { claves: ["examen", "examenes", "prueba"], texto: "Suele simbolizar una prueba de la vida real, la necesidad de demostrar algo, o el miedo al fracaso y a no estar preparado." },
+    { claves: ["desnudo", "desnuda", "desnudez"], texto: "Se vincula con la vergüenza, la vulnerabilidad o el miedo a mostrar imperfecciones ante los demás." },
+    { claves: ["diente", "dientes"], texto: "Frecuentemente asociado a procesos de cambio, madurez o a la pérdida de seguridad/poder personal." },
+    { claves: ["agua", "mar", "oceano", "tsunami", "ola"], texto: "El agua suele reflejar el estado emocional del soñante: agua calma sugiere paz interior, agua turbulenta sugiere emociones que desbordan." },
+    { claves: ["casa", "hogar"], texto: "Suele representar la propia psique. Descubrir habitaciones nuevas puede simbolizar aspectos de uno mismo todavía por explorar." },
+    { claves: ["auto", "coche", "carro", "automovil"], texto: "Suele simbolizar cómo uno se conduce en la vida y hacia dónde siente que se dirige." },
+    { claves: ["muerte", "morir", "muerto"], texto: "Rara vez es literal o premonitorio: suele indicar el cierre de una etapa para que empiece otra, o ansiedad frente a lo desconocido." },
+    { claves: ["escalera", "escaleras"], texto: "En algunas interpretaciones simboliza el ascenso a niveles de conciencia; el psicoanálisis freudiano clásico lo asocia al acto sexual." },
+    { claves: ["caja", "cajas", "armario", "baul"], texto: "El psicoanálisis freudiano clásico suele leer los objetos huecos como símbolo del útero o los genitales femeninos." },
+    { claves: ["rey", "reina", "autoridad"], texto: "Las figuras de autoridad en un sueño suelen representar a las figuras parentales." },
+    { claves: ["caida", "caer", "caerse"], texto: "Suele asociarse a la sensación de falta de control o miedo al fracaso frente a una situación de la vida despierta." },
+    { claves: ["serpiente", "serpientes", "vibora", "viboras"], texto: "Se asocia tanto a transformación y sanación como a una amenaza que todavía no se identifica del todo — el clima emocional del sueño suele indicar cuál de las dos lecturas aplica." },
+    { claves: ["espejo", "espejos"], texto: "Suele relacionarse con la autoimagen o con partes de uno mismo que se están revisando o cuestionando en este momento." },
+    { claves: ["embarazo", "embarazada"], texto: "Más allá de lo literal, suele simbolizar algo nuevo gestándose en la vida del soñante — un proyecto, una idea o un cambio todavía en desarrollo." },
+    { claves: ["boda", "casamiento"], texto: "Suele representar una unión o un compromiso importante, no necesariamente romántico — también puede ser con un proyecto o una nueva etapa." },
+    { claves: ["bebe", "bebes"], texto: "Asociado a algo nuevo y vulnerable que recién empieza: una idea, un vínculo, o un aspecto de uno mismo todavía frágil." },
+    { claves: ["dinero", "plata", "billetes"], texto: "Suele vincularse más con la sensación de valor propio y seguridad que con las finanzas en sí." },
+    { claves: ["telefono", "celular"], texto: "Cuando no funciona o no se puede marcar, es un motivo clásico ligado a la dificultad de comunicar algo o de ser escuchado en la vida despierta." },
+    { claves: ["desconocido", "desconocida"], texto: "Una persona desconocida en un sueño suele representar un aspecto propio todavía no reconocido o integrado, más que una persona real." },
+    { claves: ["avion", "aeropuerto"], texto: "Se asocia a una transición o un cambio de rumbo — el deseo, o el temor, de dejar atrás una situación." },
+    { claves: ["fuego", "incendio"], texto: "Puede representar pasión, ira o una transformación intensa; el tono emocional del sueño ayuda a distinguir cuál." },
+    { claves: ["sangre"], texto: "Suele vincularse con vitalidad, una herida reciente (literal o emocional), o algo que se siente perdido o agotado." },
+    { claves: ["llave", "llaves"], texto: "Representa acceso: a una oportunidad, una respuesta, o una parte de uno mismo que todavía no se pudo abrir." },
+    { claves: ["cabello", "pelo"], texto: "Asociado a la identidad y a cómo uno se presenta ante los demás; su caída en particular a veces se vincula con el miedo a perder atractivo o control." },
+    { claves: ["perro", "perros"], texto: "Suele representar lealtad, un vínculo de confianza, o los propios instintos protectores." },
+    { claves: ["gato", "gatos"], texto: "Asociado a independencia, intuición, o un costado más esquivo o reservado de uno mismo." },
+    { claves: ["exnovio", "exnovia", "expareja"], texto: "No siempre habla literalmente de esa persona: suele representar patrones emocionales de esa etapa que todavía resuenan." },
+    { claves: ["atrapasuenos", "colgante"], texto: "Objeto pensado tradicionalmente para filtrar los sueños; dentro de un sueño suele simbolizar el deseo de protegerse de algo, o de distinguir qué vínculos o experiencias vale la pena dejar pasar." },
+    { claves: ["caballo", "caballos"], texto: "Se asocia con libertad, fuerza vital o impulsos propios que buscan expresarse sin ataduras." },
+    { claves: ["estrellas", "cosmos"], texto: "Vinculado tradicionalmente a la introspección y a lo intuitivo — aquello que permanece oculto durante el día y sale a la superficie de noche." }
+  ];
+  function buscarEnDiccionario(tagLower) {
+    if (!tagLower || tagLower.length < 3) return null;
+    const sinTildes = tagLower.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const palabras = sinTildes.split(/\s+/);
+    for (const entry of DICCIONARIO_SIMBOLOS) {
+      if (entry.claves.some(c => palabras.includes(c))) return entry;
+    }
+    return null;
+  }
+  // Revisa tanto las etiquetas de símbolos como el relato libre, para no
+  // depender de que el usuario haya tagueado explícitamente cada elemento
+  // simbólico que mencionó al contar el sueño.
+  function simbolosDetectadosEnSueno(s) {
+    const vistos = new Set();
+    const resultados = [];
+    (s.simbolos || []).forEach(sym => {
+      const match = buscarEnDiccionario(normalizarTag(sym));
+      if (match && !vistos.has(match)) { vistos.add(match); resultados.push({ origen: sym, match }); }
+    });
+    const palabras = (s.texto || "").toLowerCase()
+      .replace(/[.,;:!?¿¡"“”'()\[\]{}—-]/g, " ")
+      .split(/\s+/);
+    palabras.forEach(palabra => {
+      const match = buscarEnDiccionario(normalizarTag(palabra));
+      if (match && !vistos.has(match)) { vistos.add(match); resultados.push({ origen: palabra, match }); }
+    });
+    return resultados;
+  }
+  document.getElementById("input-simbolos").addEventListener("input", (e) => {
+    const hintEl = document.getElementById("hint-diccionario-simbolo");
+    const match = buscarEnDiccionario(normalizarTag(e.target.value));
+    if (match) { hintEl.textContent = "💭 " + match.texto; hintEl.style.display = "block"; }
+    else { hintEl.style.display = "none"; }
+  });
+
+  // ---------- Selector rápido de emociones (emojis) ----------
+  const EMOCIONES_EMOJI = [
+    ["😨","miedo"], ["😊","alegría"], ["😰","ansiedad"], ["😌","calma"], ["😕","confusión"],
+    ["😢","tristeza"], ["😠","ira"], ["😲","sorpresa"], ["🥹","nostalgia"], ["🤩","euforia"]
+  ];
+  function renderEmojisEmociones() {
+    const cont = document.getElementById("emojis-emociones");
+    cont.innerHTML = "";
+    EMOCIONES_EMOJI.forEach(([emoji, label]) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "emoji-btn";
+      btn.title = label;
+      btn.textContent = emoji;
+      btn.addEventListener("click", () => addTag("emociones", label));
+      cont.appendChild(btn);
+    });
+  }
+  renderEmojisEmociones();
+
+  // ---------- Modo carga rápida ----------
+  document.getElementById("check-carga-rapida").addEventListener("change", (e) => {
+    ["fila-claridad-intensidad","campo-personas-wrap","campo-lugares-wrap","campo-notas-wrap"].forEach(id => {
+      document.getElementById(id).classList.toggle("oculto-rapido", e.target.checked);
+    });
+  });
+
+  // ---------- Auto-sugerencia de etiquetas desde el relato ----------
+  const STOPWORDS_ES = new Set(["que","los","las","del","por","con","una","para","como","pero","más","este","esta","estos",
+    "estas","ese","esa","esos","esas","donde","cuando","porque","también","desde","hasta","entre","sobre","mientras",
+    "aunque","todo","todos","toda","todas","otro","otra","otros","otras","algo","alguien","nada","nadie","muy","tanto",
+    "tan","solo","sólo","sino","cada","cual","cuales","quien","quienes","cómo","qué","cuál","cuáles","dónde","cuándo",
+    "estaba","estaban","había","habían","fue","fueron","era","eran","soy","eres","somos","son","tengo","tiene","tienen",
+    "tenía","hacer","hizo","hice","dijo","decir","vamos","voy","vas","van","les","nos","nosotros","ustedes","ellos",
+    "ellas","mío","mía","suyo","suya","sueño","soñé","soñar","sentí","sentía","sentir","recuerdo","recuerda","recordé",
+    "luego","después","entonces","así","allí","ahí","aquí","cuenta","siento","estar","hoy","aquella","aquel"]);
+  function extraerPalabrasClave(texto, existentes, n) {
+    const palabras = (texto || "").toLowerCase()
+      .replace(/[.,;:!?¿¡"“”'()\[\]{}—-]/g, " ")
+      .split(/\s+/)
+      .filter(w => w.length >= 4 && !STOPWORDS_ES.has(w) && !existentes.has(w));
+    const counts = new Map();
+    palabras.forEach(w => counts.set(w, (counts.get(w)||0) + 1));
+    return [...counts.entries()].sort((a,b) => b[1]-a[1]).slice(0, n).map(([w]) => w);
+  }
+  document.getElementById("campo-texto").addEventListener("blur", () => {
+    const existentes = new Set([...formTags.emociones, ...formTags.personas, ...formTags.lugares, ...formTags.simbolos].map(t => t.toLowerCase()));
+    const candidatos = extraerPalabrasClave(document.getElementById("campo-texto").value, existentes, 5);
+    const cont = document.getElementById("sugerencias-simbolos-relato");
+    cont.innerHTML = "";
+    if (!candidatos.length) return;
+    const label = document.createElement("p");
+    label.className = "hint";
+    label.style.margin = "0 0 4px";
+    label.textContent = "💡 ¿Agregar alguna como símbolo?";
+    cont.appendChild(label);
+    candidatos.forEach(palabra => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "sugerencia-chip";
+      chip.textContent = "+ " + palabra;
+      chip.addEventListener("click", () => { addTag("simbolos", palabra); chip.remove(); });
+      cont.appendChild(chip);
+    });
+  });
+
+  // ---------- Sliders ----------
+  document.getElementById("campo-claridad").addEventListener("input", (e) => {
+    document.getElementById("val-claridad").textContent = e.target.value;
+  });
+  document.getElementById("campo-intensidad").addEventListener("input", (e) => {
+    document.getElementById("val-intensidad").textContent = e.target.value;
+  });
+
+  // ---------- Formulario nuevo sueño ----------
+  const form = document.getElementById("form-sueno");
+  document.getElementById("campo-fecha").value = todayStr();
+
+  function resetForm() {
+    editingId = null;
+    form.reset();
+    document.getElementById("campo-fecha").value = todayStr();
+    actualizarFaseLunarForm();
+    document.getElementById("campo-claridad").value = 3;
+    document.getElementById("campo-intensidad").value = 3;
+    document.getElementById("val-claridad").textContent = "3";
+    document.getElementById("val-intensidad").textContent = "3";
+    formTags = { emociones: [], personas: [], lugares: [], simbolos: [] };
+    ["emociones","personas","lugares","simbolos"].forEach(renderChips);
+    document.getElementById("form-titulo").textContent = "Anotar un sueño nuevo";
+    document.getElementById("form-editando-hint").style.display = "none";
+    document.getElementById("btn-guardar-sueno").textContent = "Guardar sueño";
+    document.getElementById("btn-cancelar-edicion").style.display = "none";
+    document.getElementById("hint-diccionario-simbolo").style.display = "none";
+    document.getElementById("sugerencias-simbolos-relato").innerHTML = "";
+    dictadosRegistrados.forEach(estado => { if (estado.recognizing && estado.recognition) estado.recognition.stop(); });
+  }
+
+  document.getElementById("btn-cancelar-edicion").addEventListener("click", () => { resetForm(); });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const sueno = {
+      id: editingId || uid(),
+      fecha: document.getElementById("campo-fecha").value || todayStr(),
+      fechaRegistro: editingId ? (state.suenos.find(s=>s.id===editingId)||{}).fechaRegistro || new Date().toISOString() : new Date().toISOString(),
+      titulo: document.getElementById("campo-titulo").value.trim(),
+      texto: document.getElementById("campo-texto").value.trim(),
+      tipo: document.getElementById("campo-tipo").value,
+      claridad: Number(document.getElementById("campo-claridad").value),
+      intensidad: Number(document.getElementById("campo-intensidad").value),
+      emociones: [...formTags.emociones],
+      personas: [...formTags.personas],
+      lugares: [...formTags.lugares],
+      simbolos: [...formTags.simbolos],
+      notas: document.getElementById("campo-notas").value.trim(),
+      interpretado: editingId ? !!(state.suenos.find(s=>s.id===editingId)||{}).interpretado : false
+    };
+    if (editingId) {
+      const idx = state.suenos.findIndex(s => s.id === editingId);
+      if (idx !== -1) state.suenos[idx] = sueno;
+    } else {
+      state.suenos.push(sueno);
+    }
+    guardarEstado();
+    resetForm();
+    activarTab("lista");
+  });
+
+  // ---------- Lista de sueños ----------
+  function coincideFiltro(s, texto, tipo, desde, hasta) {
+    if (tipo && s.tipo !== tipo) return false;
+    if (desde && s.fecha < desde) return false;
+    if (hasta && s.fecha > hasta) return false;
+    if (texto) {
+      const t = texto.toLowerCase();
+      const haystack = [s.titulo, s.texto, s.notas, ...(s.emociones||[]), ...(s.personas||[]), ...(s.lugares||[]), ...(s.simbolos||[])]
+        .join(" ").toLowerCase();
+      if (!haystack.includes(t)) return false;
+    }
+    return true;
+  }
+
+  function crearDreamCardEl(s) {
+    const card = document.createElement("div");
+    card.className = "dream-card";
+    const topRow = document.createElement("div");
+    topRow.className = "top-row";
+    const fecha = document.createElement("span");
+    fecha.className = "fecha";
+    fecha.textContent = s.fecha;
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.style.background = TIPO_COLORVAR[s.tipo] || "var(--blue)";
+    badge.textContent = TIPO_LABELS[s.tipo] || s.tipo;
+    topRow.append(fecha, badge);
+
+    const h4 = document.createElement("h4");
+    h4.textContent = s.titulo || "(sin título)";
+
+    const excerpt = document.createElement("p");
+    excerpt.className = "excerpt";
+    excerpt.textContent = (s.texto || "").slice(0, 160) + ((s.texto||"").length > 160 ? "…" : "");
+
+    const chipsRow = document.createElement("div");
+    chipsRow.className = "chips-inline";
+    [...(s.emociones||[]), ...(s.simbolos||[])].slice(0,6).forEach(tag => {
+      const c = document.createElement("span");
+      c.className = "chip-static";
+      c.textContent = tag;
+      chipsRow.appendChild(c);
+    });
+
+    card.append(topRow, h4, excerpt, chipsRow);
+    card.addEventListener("click", () => abrirDetalle(s.id));
+    return card;
+  }
+
+  function renderLista() {
+    const cont = document.getElementById("lista-suenos");
+    const texto = document.getElementById("filtro-texto").value;
+    const tipo = document.getElementById("filtro-tipo").value;
+    const desde = document.getElementById("filtro-desde").value;
+    const hasta = document.getElementById("filtro-hasta").value;
+
+    const filtrados = state.suenos
+      .filter(s => coincideFiltro(s, texto, tipo, desde, hasta))
+      .sort((a,b) => (b.fecha + b.fechaRegistro).localeCompare(a.fecha + a.fechaRegistro));
+
+    cont.innerHTML = "";
+    if (!filtrados.length) {
+      const p = document.createElement("p");
+      p.className = "empty-msg";
+      p.textContent = state.suenos.length ? "No hay sueños que coincidan con el filtro." : "Todavía no anotaste ningún sueño. Empezá desde la pestaña \"Nuevo sueño\".";
+      cont.appendChild(p);
+      return;
+    }
+    filtrados.forEach(s => cont.appendChild(crearDreamCardEl(s)));
+  }
+  ["filtro-texto","filtro-tipo","filtro-desde","filtro-hasta"].forEach(id => {
+    document.getElementById(id).addEventListener("input", renderLista);
+  });
+
+  // ---------- Modal detalle ----------
+  function abrirDetalle(id) {
+    const s = state.suenos.find(x => x.id === id);
+    if (!s) return;
+    const overlay = document.getElementById("modal-overlay");
+    const box = document.getElementById("modal-box");
+    box.innerHTML = "";
+
+    const h2 = document.createElement("h2");
+    h2.style.marginTop = "0";
+    h2.textContent = s.titulo || "(sin título)";
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.style.background = TIPO_COLORVAR[s.tipo] || "var(--blue)";
+    badge.style.marginLeft = "8px";
+    badge.textContent = TIPO_LABELS[s.tipo] || s.tipo;
+    h2.appendChild(badge);
+
+    const dl = document.createElement("dl");
+    function addDT(label, value) {
+      if (!value) return;
+      const dt = document.createElement("dt"); dt.textContent = label;
+      const dd = document.createElement("dd"); dd.textContent = value;
+      dl.append(dt, dd);
+    }
+    addDT("Fecha", s.fecha);
+    addDT("Claridad del recuerdo", s.claridad + "/5");
+    addDT("Intensidad emocional", s.intensidad + "/5");
+    addDT("Emociones", (s.emociones||[]).join(", "));
+    addDT("Personas", (s.personas||[]).join(", "));
+    addDT("Lugares", (s.lugares||[]).join(", "));
+    addDT("Símbolos", (s.simbolos||[]).join(", "));
+    const lecturas = simbolosDetectadosEnSueno(s);
+    if (lecturas.length) {
+      addDT("Posibles lecturas simbólicas", lecturas.map(l => `${l.origen}: ${l.match.texto}`).join("\n\n") +
+        "\n\n(Lecturas tradicionales de referencia, detectadas en las etiquetas y en el relato — no son un diagnóstico ni una verdad universal.)");
+    }
+    addDT("Fase lunar", faseLunarSimplificada(s.fecha).label);
+    addDT("Relato", s.texto);
+    addDT("Notas al despertar", s.notas);
+
+    const sesiones = state.interpretaciones.filter(it => (it.suenosIds||[]).includes(s.id) && it.respuesta);
+    if (sesiones.length) {
+      const dt = document.createElement("dt"); dt.textContent = "Interpretaciones guardadas";
+      const dd = document.createElement("dd");
+      dd.textContent = sesiones.map(it => new Date(it.fecha).toLocaleDateString("es-AR")).join(", ");
+      dl.append(dt, dd);
+    }
+
+    const btnRow = document.createElement("div");
+    btnRow.className = "btn-row";
+    btnRow.style.marginTop = "16px";
+    const btnEditar = document.createElement("button");
+    btnEditar.className = "btn"; btnEditar.textContent = "Editar";
+    btnEditar.addEventListener("click", () => { cerrarModal(); cargarParaEditar(s.id); });
+    const btnEliminar = document.createElement("button");
+    btnEliminar.className = "btn danger"; btnEliminar.textContent = "Eliminar";
+    btnEliminar.addEventListener("click", () => {
+      if (confirm("¿Eliminar este sueño? Esta acción no se puede deshacer.")) {
+        state.suenos = state.suenos.filter(x => x.id !== s.id);
+        guardarEstado();
+        cerrarModal();
+        renderLista();
+      }
+    });
+    const btnCerrar = document.createElement("button");
+    btnCerrar.className = "btn secondary"; btnCerrar.textContent = "Cerrar";
+    btnCerrar.addEventListener("click", cerrarModal);
+    btnRow.append(btnEditar, btnEliminar, btnCerrar);
+
+    box.append(h2, dl, btnRow);
+    overlay.style.display = "flex";
+  }
+  function cerrarModal() { document.getElementById("modal-overlay").style.display = "none"; }
+  document.getElementById("modal-overlay").addEventListener("click", (e) => {
+    if (e.target.id === "modal-overlay") cerrarModal();
+  });
+
+  function cargarParaEditar(id) {
+    const s = state.suenos.find(x => x.id === id);
+    if (!s) return;
+    editingId = id;
+    document.getElementById("campo-fecha").value = s.fecha;
+    actualizarFaseLunarForm();
+    document.getElementById("campo-titulo").value = s.titulo || "";
+    document.getElementById("campo-texto").value = s.texto || "";
+    document.getElementById("campo-tipo").value = s.tipo || "normal";
+    document.getElementById("campo-claridad").value = s.claridad || 3;
+    document.getElementById("val-claridad").textContent = String(s.claridad || 3);
+    document.getElementById("campo-intensidad").value = s.intensidad || 3;
+    document.getElementById("val-intensidad").textContent = String(s.intensidad || 3);
+    document.getElementById("campo-notas").value = s.notas || "";
+    formTags = {
+      emociones: [...(s.emociones||[])],
+      personas: [...(s.personas||[])],
+      lugares: [...(s.lugares||[])],
+      simbolos: [...(s.simbolos||[])]
+    };
+    ["emociones","personas","lugares","simbolos"].forEach(renderChips);
+    document.getElementById("form-titulo").textContent = "Editando sueño";
+    document.getElementById("form-editando-hint").style.display = "block";
+    document.getElementById("btn-guardar-sueno").textContent = "Guardar cambios";
+    document.getElementById("btn-cancelar-edicion").style.display = "inline-block";
+    document.getElementById("check-carga-rapida").checked = false;
+    ["fila-claridad-intensidad","campo-personas-wrap","campo-lugares-wrap","campo-notas-wrap"].forEach(id => {
+      document.getElementById(id).classList.remove("oculto-rapido");
+    });
+    document.getElementById("hint-diccionario-simbolo").style.display = "none";
+    document.getElementById("sugerencias-simbolos-relato").innerHTML = "";
+    dictadosRegistrados.forEach(estado => { if (estado.recognizing && estado.recognition) estado.recognition.stop(); });
+    activarTab("nuevo");
+  }
+
+  // ---------- Helpers SVG ----------
+  function svgText(x, y, text, anchor, fill, size) {
+    const t = document.createElementNS(svgNS, "text");
+    t.setAttribute("x", x); t.setAttribute("y", y);
+    t.setAttribute("text-anchor", anchor);
+    t.setAttribute("fill", fill);
+    t.setAttribute("font-size", size || "12");
+    t.setAttribute("font-family", "inherit");
+    t.textContent = text;
+    return t;
+  }
+  function roundedRightRectPath(x, y, w, h, r) {
+    if (w <= 0) return "";
+    r = Math.min(r, h/2, Math.max(w,0.01));
+    return `M ${x} ${y} H ${x+w-r} Q ${x+w} ${y} ${x+w} ${y+r} V ${y+h-r} Q ${x+w} ${y+h} ${x+w-r} ${y+h} H ${x} Z`;
+  }
+  function truncate(str, n) { return str.length > n ? str.slice(0, n-1) + "…" : str; }
+
+  function renderBarChart(svgEl, items) {
+    svgEl.innerHTML = "";
+    if (!items.length) { svgEl.setAttribute("height", 40); return; }
+    const width = svgEl.clientWidth || 600;
+    const rowH = 30, barH = 18, labelW = 120;
+    const maxVal = Math.max(1, ...items.map(i => i.value));
+    const chartW = Math.max(40, width - labelW - 46);
+    const height = items.length * rowH + 6;
+    svgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svgEl.setAttribute("height", height);
+    items.forEach((item, i) => {
+      const rowY = i * rowH + 3;
+      const barY = rowY + (rowH - barH) / 2;
+      const w = Math.max(2, (item.value / maxVal) * chartW);
+      const g = document.createElementNS(svgNS, "g");
+      const title = document.createElementNS(svgNS, "title");
+      title.textContent = item.onClick ? `${item.label}: ${item.value} (click para explorar)` : `${item.label}: ${item.value}`;
+      g.appendChild(title);
+      const label = svgText(labelW - 8, rowY + rowH/2 + 4, truncate(item.label, 16), "end", "var(--text-sec)");
+      const bar = document.createElementNS(svgNS, "path");
+      bar.setAttribute("d", roundedRightRectPath(labelW, barY, w, barH, 4));
+      bar.setAttribute("fill", item.colorVar || "var(--blue)");
+      const val = svgText(labelW + w + 8, rowY + rowH/2 + 4, String(item.value), "start", "var(--text)");
+      g.append(label, bar, val);
+      if (item.onClick) { g.classList.add("chart-clickable"); g.addEventListener("click", item.onClick); }
+      svgEl.appendChild(g);
+    });
+  }
+
+  function startOfWeek(dateStr) {
+    const d = new Date(dateStr + "T00:00:00");
+    const day = d.getDay();
+    const diff = (day === 0 ? -6 : 1) - day;
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+  function fmtDM(d) { return String(d.getDate()).padStart(2,"0") + "/" + String(d.getMonth()+1).padStart(2,"0"); }
+
+  function computeWeeklyCounts(suenos, weeks) {
+    const counts = new Map();
+    suenos.forEach(s => {
+      if (!s.fecha) return;
+      const ws = startOfWeek(s.fecha);
+      const key = ws.toISOString().slice(0,10);
+      counts.set(key, (counts.get(key)||0) + 1);
+    });
+    const thisWeekStart = startOfWeek(todayStr());
+    const points = [];
+    for (let i = weeks - 1; i >= 0; i--) {
+      const d = new Date(thisWeekStart);
+      d.setDate(d.getDate() - i*7);
+      const key = d.toISOString().slice(0,10);
+      points.push({ label: fmtDM(d), value: counts.get(key) || 0 });
+    }
+    return points;
+  }
+
+  function renderLineChart(svgEl, points) {
+    svgEl.innerHTML = "";
+    const width = svgEl.clientWidth || 600, height = 220;
+    const padL = 34, padR = 16, padT = 20, padB = 26;
+    const innerW = width - padL - padR, innerH = height - padT - padB;
+    const maxVal = Math.max(1, ...points.map(p => p.value));
+    const niceMax = Math.max(1, Math.ceil(maxVal * 1.2));
+    const stepX = innerW / Math.max(1, points.length - 1);
+    const xy = points.map((p, i) => ({ x: padL + i*stepX, y: padT + innerH - (p.value/niceMax)*innerH, ...p }));
+    svgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+    [0, 0.5, 1].forEach(frac => {
+      const gy = padT + innerH - frac*innerH;
+      const line = document.createElementNS(svgNS, "line");
+      line.setAttribute("x1", padL); line.setAttribute("x2", padL + innerW);
+      line.setAttribute("y1", gy); line.setAttribute("y2", gy);
+      line.setAttribute("stroke", "var(--grid)"); line.setAttribute("stroke-width", "1");
+      svgEl.appendChild(line);
+      svgEl.appendChild(svgText(padL - 8, gy + 4, String(Math.round(frac*niceMax)), "end", "var(--muted)", "11"));
+    });
+
+    let areaD = `M ${xy[0].x} ${padT+innerH} `;
+    xy.forEach(p => areaD += `L ${p.x} ${p.y} `);
+    areaD += `L ${xy[xy.length-1].x} ${padT+innerH} Z`;
+    const area = document.createElementNS(svgNS, "path");
+    area.setAttribute("d", areaD); area.setAttribute("fill", "var(--blue)"); area.setAttribute("opacity", "0.1");
+    svgEl.appendChild(area);
+
+    const lineD = xy.map((p,i) => (i===0?"M ":"L ") + p.x + " " + p.y).join(" ");
+    const linePath = document.createElementNS(svgNS, "path");
+    linePath.setAttribute("d", lineD); linePath.setAttribute("fill","none");
+    linePath.setAttribute("stroke","var(--blue)"); linePath.setAttribute("stroke-width","2");
+    linePath.setAttribute("stroke-linejoin","round"); linePath.setAttribute("stroke-linecap","round");
+    svgEl.appendChild(linePath);
+
+    const showEvery = points.length > 8 ? 2 : 1;
+    xy.forEach((p, i) => {
+      const g = document.createElementNS(svgNS, "g");
+      const ring = document.createElementNS(svgNS, "circle");
+      ring.setAttribute("cx", p.x); ring.setAttribute("cy", p.y); ring.setAttribute("r", "6"); ring.setAttribute("fill", "var(--surface)");
+      const dot = document.createElementNS(svgNS, "circle");
+      dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y); dot.setAttribute("r", "4"); dot.setAttribute("fill", "var(--blue)");
+      const title = document.createElementNS(svgNS, "title");
+      title.textContent = `Semana del ${p.label}: ${p.value} sueño(s)`;
+      g.append(ring, dot, title);
+      svgEl.appendChild(g);
+      if (i % showEvery === 0 || i === xy.length - 1) {
+        svgEl.appendChild(svgText(p.x, height - 6, p.label, "middle", "var(--muted)", "10"));
+      }
+    });
+    const last = xy[xy.length-1];
+    svgEl.appendChild(svgText(last.x, Math.max(14, last.y - 10), String(last.value), "middle", "var(--text)", "12"));
+  }
+
+  // ---------- Mapa personal ----------
+  function computeStreak(suenos) {
+    if (!suenos.length) return 0;
+    const dates = new Set(suenos.map(s => s.fecha).filter(Boolean));
+    const sorted = [...dates].sort().reverse();
+    if (!sorted.length) return 0;
+    let cursor = new Date(sorted[0] + "T00:00:00");
+    let streak = 0;
+    while (dates.has(cursor.toISOString().slice(0,10))) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+  }
+  function topFrecuencia(suenos, campo, n) {
+    const counts = new Map();
+    suenos.forEach(s => {
+      (s[campo] || []).forEach(tag => {
+        const key = tag.trim().toLowerCase();
+        if (!key) return;
+        const entry = counts.get(key) || { label: tag.trim(), value: 0 };
+        entry.value++;
+        counts.set(key, entry);
+      });
+    });
+    return [...counts.values()].sort((a,b) => b.value - a.value).slice(0, n);
+  }
+
+  function renderMapa() {
+    const suenos = state.suenos;
+    const total = suenos.length;
+    const now = new Date();
+    const esteMes = suenos.filter(s => s.fecha && s.fecha.slice(0,7) === (now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0"))).length;
+    const lucidos = suenos.filter(s => s.tipo === "lucido").length;
+    const pctLucidos = total ? Math.round((lucidos/total)*100) : 0;
+    const racha = computeStreak(suenos);
+
+    const statGrid = document.getElementById("stat-grid");
+    statGrid.innerHTML = "";
+    [
+      ["Total registrados", total],
+      ["Este mes", esteMes],
+      ["Racha actual (días)", racha],
+      ["% lúcidos", pctLucidos + "%"]
+    ].forEach(([label, value]) => {
+      const tile = document.createElement("div");
+      tile.className = "stat-tile";
+      tile.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+      statGrid.appendChild(tile);
+    });
+
+    renderHeatmap(document.getElementById("chart-heatmap"), computeCalendarDays(53));
+    renderLineChart(document.getElementById("chart-timeline"), computeWeeklyCounts(suenos, 12));
+
+    const tiposItems = ["normal","lucido","pesadilla","recurrente","astral"].map(tipo => ({
+      label: TIPO_LABELS[tipo],
+      value: suenos.filter(s => s.tipo === tipo).length,
+      colorVar: TIPO_COLORVAR[tipo]
+    }));
+    renderBarChart(document.getElementById("chart-tipos"), tiposItems);
+
+    const lunaItems = FASE_LUNAR_SIMPLE.map(fase => ({
+      label: fase.label,
+      value: suenos.filter(s => s.fecha && faseLunarSimplificada(s.fecha).key === fase.key).length,
+      colorVar: "var(--violet)"
+    }));
+    renderBarChart(document.getElementById("chart-luna"), lunaItems);
+
+    const emociones = topFrecuencia(suenos, "emociones", 8).map(it => ({
+      ...it, colorVar: "var(--blue)", onClick: () => irAConexiones(it.label)
+    }));
+    renderBarChart(document.getElementById("chart-emociones"), emociones);
+    document.getElementById("hint-emociones").style.display = emociones.length ? "none" : "block";
+
+    const simbolos = topFrecuencia(suenos, "simbolos", 8).map(it => ({
+      ...it, colorVar: "var(--aqua)", onClick: () => irAConexiones(it.label)
+    }));
+    renderBarChart(document.getElementById("chart-simbolos"), simbolos);
+    document.getElementById("hint-simbolos").style.display = simbolos.length ? "none" : "block";
+  }
+  window.addEventListener("resize", () => {
+    if (document.getElementById("tab-mapa").classList.contains("active")) renderMapa();
+  });
+
+  // ---------- Interpretar ----------
+  const selectRango = document.getElementById("select-rango-interpretar");
+  selectRango.addEventListener("change", () => {
+    document.getElementById("opciones-ultimos-dias").style.display = selectRango.value === "ultimos_dias" ? "flex" : "none";
+    document.getElementById("opciones-rango-fechas").style.display = selectRango.value === "rango_fechas" ? "flex" : "none";
+    actualizarPreviewSeleccion();
+  });
+  document.getElementById("campo-ultimos-dias").addEventListener("input", actualizarPreviewSeleccion);
+  document.getElementById("campo-rango-desde").addEventListener("input", actualizarPreviewSeleccion);
+  document.getElementById("campo-rango-hasta").addEventListener("input", actualizarPreviewSeleccion);
+
+  function suenosSeleccionados() {
+    const modo = selectRango.value;
+    let lista = [...state.suenos];
+    if (modo === "sin_interpretar") {
+      lista = lista.filter(s => !s.interpretado);
+    } else if (modo === "ultimos_dias") {
+      const dias = Number(document.getElementById("campo-ultimos-dias").value) || 30;
+      const limite = new Date();
+      limite.setDate(limite.getDate() - dias);
+      const limiteStr = limite.toISOString().slice(0,10);
+      lista = lista.filter(s => s.fecha >= limiteStr);
+    } else if (modo === "rango_fechas") {
+      const desde = document.getElementById("campo-rango-desde").value;
+      const hasta = document.getElementById("campo-rango-hasta").value;
+      lista = lista.filter(s => (!desde || s.fecha >= desde) && (!hasta || s.fecha <= hasta));
+    }
+    return lista.sort((a,b) => a.fecha.localeCompare(b.fecha));
+  }
+
+  function actualizarPreviewSeleccion() {
+    const sel = suenosSeleccionados();
+    const p = document.getElementById("preview-seleccion");
+    p.textContent = sel.length
+      ? `Se incluirán ${sel.length} sueño(s): ` + sel.map(s => s.fecha).join(", ")
+      : "No hay sueños que coincidan con esta selección.";
+  }
+
+  function generarPrompt(sel) {
+    let txt = "Actuá como un acompañante reflexivo para interpretar sueños (no como profesional clínico ni para diagnóstico médico o psicológico). ";
+    txt += "Te paso un registro de sueños que anoté. Quiero que me ayudes a:\n";
+    txt += "1. Identificar símbolos, personas, lugares o emociones que se repiten entre estos sueños.\n";
+    txt += "2. Señalar posibles conexiones con mi vida despierta o mi estado emocional reciente.\n";
+    txt += "3. Ofrecer una interpretación reflexiva y respetuosa, sin afirmaciones absolutas ni alarmistas.\n";
+    txt += "4. Sugerir 2 o 3 preguntas para que yo mismo siga explorando estos patrones.\n\n";
+    txt += "Aclaración: esto es para autoconocimiento personal, no reemplaza terapia ni diagnóstico psicológico.\n\n";
+    txt += "--- Sueños ---\n\n";
+    sel.forEach(s => {
+      txt += `Fecha: ${s.fecha} — ${s.titulo || "(sin título)"}\n`;
+      txt += `Tipo: ${TIPO_LABELS[s.tipo] || s.tipo} | Claridad: ${s.claridad}/5 | Intensidad emocional: ${s.intensidad}/5\n`;
+      if (s.emociones && s.emociones.length) txt += `Emociones: ${s.emociones.join(", ")}\n`;
+      if (s.personas && s.personas.length) txt += `Personas: ${s.personas.join(", ")}\n`;
+      if (s.lugares && s.lugares.length) txt += `Lugares: ${s.lugares.join(", ")}\n`;
+      if (s.simbolos && s.simbolos.length) txt += `Símbolos: ${s.simbolos.join(", ")}\n`;
+      const lecturasDetectadas = simbolosDetectadosEnSueno(s);
+      if (lecturasDetectadas.length) {
+        txt += `Lecturas simbólicas tradicionales de referencia, detectadas en las etiquetas o el relato (no las tomes como verdad cerrada): ${lecturasDetectadas.map(l => l.match.texto).join(" ")}\n`;
+      }
+      txt += `Relato: ${s.texto || "(sin relato)"}\n`;
+      if (s.notas) txt += `Notas al despertar: ${s.notas}\n`;
+      txt += "\n---\n\n";
+    });
+    return txt;
+  }
+
+  let seleccionActual = [];
+  document.getElementById("btn-generar-prompt").addEventListener("click", () => {
+    seleccionActual = suenosSeleccionados();
+    if (!seleccionActual.length) { alert("No hay sueños que coincidan con esta selección."); return; }
+    document.getElementById("prompt-generado").value = generarPrompt(seleccionActual);
+    document.getElementById("bloque-prompt").style.display = "block";
+    document.getElementById("bloque-respuesta").style.display = "block";
+  });
+  document.getElementById("btn-copiar-prompt").addEventListener("click", async () => {
+    const ta = document.getElementById("prompt-generado");
+    try {
+      await navigator.clipboard.writeText(ta.value);
+      const btn = document.getElementById("btn-copiar-prompt");
+      const original = btn.textContent;
+      btn.textContent = "¡Copiado!";
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    } catch (e) {
+      ta.select();
+      document.execCommand("copy");
+    }
+  });
+  document.getElementById("btn-guardar-interpretacion").addEventListener("click", () => {
+    const respuesta = document.getElementById("respuesta-ia").value.trim();
+    if (!seleccionActual.length) { alert("Primero generá un prompt."); return; }
+    if (!respuesta) { alert("Pegá la respuesta de la IA antes de guardar."); return; }
+    const sesion = {
+      id: uid(),
+      fecha: new Date().toISOString(),
+      suenosIds: seleccionActual.map(s => s.id),
+      prompt: document.getElementById("prompt-generado").value,
+      respuesta
+    };
+    state.interpretaciones.push(sesion);
+    seleccionActual.forEach(s => {
+      const found = state.suenos.find(x => x.id === s.id);
+      if (found) found.interpretado = true;
+    });
+    guardarEstado();
+    document.getElementById("respuesta-ia").value = "";
+    document.getElementById("bloque-prompt").style.display = "none";
+    document.getElementById("bloque-respuesta").style.display = "none";
+    actualizarPreviewSeleccion();
+    renderHistorialInterpretaciones();
+    alert("Interpretación guardada.");
+  });
+
+  function renderHistorialInterpretaciones() {
+    const cont = document.getElementById("historial-interpretaciones");
+    cont.innerHTML = "";
+    const sesiones = [...state.interpretaciones].sort((a,b) => b.fecha.localeCompare(a.fecha));
+    if (!sesiones.length) {
+      const p = document.createElement("p");
+      p.className = "empty-msg";
+      p.textContent = "Todavía no guardaste ninguna interpretación.";
+      cont.appendChild(p);
+      return;
+    }
+    sesiones.forEach(sesion => {
+      const det = document.createElement("details");
+      det.className = "session";
+      const sum = document.createElement("summary");
+      sum.textContent = `${new Date(sesion.fecha).toLocaleDateString("es-AR")} — ${(sesion.suenosIds||[]).length} sueño(s)`;
+      const resp = document.createElement("div");
+      resp.className = "respuesta";
+      resp.textContent = sesion.respuesta || "(sin respuesta guardada)";
+      det.append(sum, resp);
+      cont.appendChild(det);
+    });
+  }
+
+  // ---------- Backup ----------
+  function downloadFile(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function renderBackup() {
+    const banner = document.getElementById("banner-backup");
+    const ultimo = localStorage.getItem(BACKUP_KEY);
+    banner.innerHTML = "";
+    if (!ultimo) {
+      const div = document.createElement("div");
+      div.className = "banner";
+      div.textContent = "Todavía no exportaste ningún backup. Se recomienda hacerlo después de cargar varios sueños.";
+      banner.appendChild(div);
+    } else {
+      const dias = Math.floor((Date.now() - new Date(ultimo).getTime()) / (1000*60*60*24));
+      if (dias >= 14) {
+        const div = document.createElement("div");
+        div.className = "banner";
+        div.textContent = `Hace ${dias} días que no exportás un backup. Conviene hacer uno nuevo.`;
+        banner.appendChild(div);
+      }
+    }
+    document.getElementById("stats-backup").textContent =
+      `${state.suenos.length} sueño(s) registrados · ${state.interpretaciones.length} interpretación(es) guardada(s)` +
+      (ultimo ? ` · último backup: ${new Date(ultimo).toLocaleString("es-AR")}` : "");
+  }
+
+  document.getElementById("btn-exportar-json").addEventListener("click", () => {
+    downloadFile(`diario-suenos-backup-${todayStr()}.json`, JSON.stringify(state, null, 2), "application/json");
+    localStorage.setItem(BACKUP_KEY, new Date().toISOString());
+    renderBackup();
+  });
+
+  document.getElementById("btn-exportar-md").addEventListener("click", () => {
+    const ordenados = [...state.suenos].sort((a,b) => a.fecha.localeCompare(b.fecha));
+    let md = `# Diario de Sueños\n\nExportado el ${new Date().toLocaleString("es-AR")}\n\n`;
+    ordenados.forEach(s => {
+      md += `## ${s.fecha} — ${s.titulo || "(sin título)"}\n\n`;
+      md += `- Tipo: ${TIPO_LABELS[s.tipo] || s.tipo}\n- Claridad: ${s.claridad}/5\n- Intensidad emocional: ${s.intensidad}/5\n`;
+      if (s.emociones && s.emociones.length) md += `- Emociones: ${s.emociones.join(", ")}\n`;
+      if (s.personas && s.personas.length) md += `- Personas: ${s.personas.join(", ")}\n`;
+      if (s.lugares && s.lugares.length) md += `- Lugares: ${s.lugares.join(", ")}\n`;
+      if (s.simbolos && s.simbolos.length) md += `- Símbolos: ${s.simbolos.join(", ")}\n`;
+      md += `\n${s.texto || ""}\n\n`;
+      if (s.notas) md += `**Notas al despertar:** ${s.notas}\n\n`;
+      md += "---\n\n";
+    });
+    if (state.interpretaciones.length) {
+      md += "# Interpretaciones guardadas\n\n";
+      [...state.interpretaciones].sort((a,b) => a.fecha.localeCompare(b.fecha)).forEach(it => {
+        md += `## Sesión del ${new Date(it.fecha).toLocaleDateString("es-AR")}\n\n${it.respuesta || "(sin respuesta guardada)"}\n\n---\n\n`;
+      });
+    }
+    downloadFile(`diario-suenos-${todayStr()}.md`, md, "text/markdown");
+    localStorage.setItem(BACKUP_KEY, new Date().toISOString());
+    renderBackup();
+  });
+
+  document.getElementById("input-importar-json").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (!parsed || !Array.isArray(parsed.suenos)) { alert("El archivo no tiene el formato esperado."); return; }
+        const reemplazar = confirm("Aceptar = reemplazar todos los datos actuales con este backup.\nCancelar = fusionar (agregar solo lo que falte).");
+        if (reemplazar) {
+          state.suenos = parsed.suenos;
+          state.interpretaciones = Array.isArray(parsed.interpretaciones) ? parsed.interpretaciones : [];
+        } else {
+          const idsExistentes = new Set(state.suenos.map(s => s.id));
+          parsed.suenos.forEach(s => { if (!idsExistentes.has(s.id)) state.suenos.push(s); });
+          const idsInterp = new Set(state.interpretaciones.map(i => i.id));
+          (parsed.interpretaciones||[]).forEach(i => { if (!idsInterp.has(i.id)) state.interpretaciones.push(i); });
+        }
+        guardarEstado();
+        renderBackup();
+        renderLista();
+        alert("Importación completada.");
+      } catch (err) {
+        alert("No se pudo leer el archivo: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  // ---------- Fase lunar ----------
+  const FASE_LUNAR_SIMPLE = [
+    { key: "nueva", label: "🌑 Nueva" },
+    { key: "creciente", label: "🌓 Creciente" },
+    { key: "llena", label: "🌕 Llena" },
+    { key: "menguante", label: "🌗 Menguante" }
+  ];
+  function faseLunarIndice(dateStr) {
+    const d = new Date(dateStr + "T12:00:00Z");
+    const knownNewMoon = Date.UTC(2000,0,6,18,14);
+    const synodic = 29.53058867;
+    const diffDays = (d.getTime() - knownNewMoon) / 86400000;
+    let phase = diffDays % synodic;
+    if (phase < 0) phase += synodic;
+    const frac = phase / synodic;
+    return Math.floor(frac * 8 + 0.5) % 8;
+  }
+  function faseLunarSimplificada(dateStr) {
+    if (!dateStr) return FASE_LUNAR_SIMPLE[0];
+    const idx = faseLunarIndice(dateStr);
+    if (idx === 0) return FASE_LUNAR_SIMPLE[0];
+    if (idx >= 1 && idx <= 3) return FASE_LUNAR_SIMPLE[1];
+    if (idx === 4) return FASE_LUNAR_SIMPLE[2];
+    return FASE_LUNAR_SIMPLE[3];
+  }
+  function actualizarFaseLunarForm() {
+    const fecha = document.getElementById("campo-fecha").value;
+    document.getElementById("fase-lunar-form").textContent = fecha ? "Fase lunar: " + faseLunarSimplificada(fecha).label : "";
+  }
+  document.getElementById("campo-fecha").addEventListener("input", actualizarFaseLunarForm);
+  document.getElementById("campo-fecha").addEventListener("change", actualizarFaseLunarForm);
+
+  // ---------- Calendario de constancia ----------
+  const MESES_CORTOS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  function computeCalendarDays(weeksCount) {
+    const thisWeekStart = startOfWeek(todayStr());
+    const start = new Date(thisWeekStart);
+    start.setDate(start.getDate() - (weeksCount - 1) * 7);
+    const counts = new Map();
+    state.suenos.forEach(s => { if (!s.fecha) return; counts.set(s.fecha, (counts.get(s.fecha)||0) + 1); });
+    const weeks = [];
+    for (let w = 0; w < weeksCount; w++) {
+      const col = [];
+      for (let d = 0; d < 7; d++) {
+        const day = new Date(start);
+        day.setDate(day.getDate() + w*7 + d);
+        const key = day.toISOString().slice(0,10);
+        col.push({ date: day, key, count: counts.get(key) || 0 });
+      }
+      weeks.push(col);
+    }
+    return weeks;
+  }
+  function renderHeatmap(svgEl, weeks) {
+    svgEl.innerHTML = "";
+    const cell = 11, gap = 3, colW = cell + gap;
+    const topPad = 16, leftPad = 4;
+    const width = leftPad + weeks.length * colW;
+    const height = topPad + 7 * colW;
+    svgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svgEl.setAttribute("height", height);
+    let lastMonth = -1;
+    weeks.forEach((col, w) => {
+      const x = leftPad + w * colW;
+      const month = col[0].date.getMonth();
+      if (month !== lastMonth) {
+        svgEl.appendChild(svgText(x, topPad - 5, MESES_CORTOS[month], "start", "var(--muted)", "10"));
+        lastMonth = month;
+      }
+      col.forEach((day, d) => {
+        const y = topPad + d * colW;
+        const rect = document.createElementNS(svgNS, "rect");
+        rect.setAttribute("x", x); rect.setAttribute("y", y);
+        rect.setAttribute("width", cell); rect.setAttribute("height", cell);
+        rect.setAttribute("rx", 2);
+        if (day.count === 0) {
+          rect.setAttribute("fill", "var(--grid)");
+        } else {
+          rect.setAttribute("fill", "var(--blue)");
+          rect.setAttribute("fill-opacity", day.count === 1 ? "0.4" : (day.count === 2 ? "0.7" : "1"));
+        }
+        const title = document.createElementNS(svgNS, "title");
+        const fechaFmt = fmtDM(day.date);
+        title.textContent = day.count ? `${fechaFmt}: ${day.count} sueño(s)` : `${fechaFmt}: sin sueños`;
+        rect.appendChild(title);
+        svgEl.appendChild(rect);
+      });
+    });
+  }
+
+  // ---------- Conexiones (explorador de etiquetas) ----------
+  function normalizarTag(t) { return t.trim().toLowerCase(); }
+  const CAMPOS_TAG = ["emociones","personas","lugares","simbolos"];
+
+  function getAllTagCounts() {
+    const counts = new Map();
+    state.suenos.forEach(s => {
+      CAMPOS_TAG.forEach(campo => {
+        (s[campo] || []).forEach(tag => {
+          const key = normalizarTag(tag);
+          if (!key) return;
+          const entry = counts.get(key) || { label: tag.trim(), value: 0 };
+          entry.value++;
+          counts.set(key, entry);
+        });
+      });
+    });
+    return counts;
+  }
+  function suenosConTag(tagLower) {
+    return state.suenos.filter(s => CAMPOS_TAG.some(campo => (s[campo]||[]).some(t => normalizarTag(t) === tagLower)));
+  }
+  function coOcurrencias(tagLower, n) {
+    const relacionados = suenosConTag(tagLower);
+    const counts = new Map();
+    relacionados.forEach(s => {
+      CAMPOS_TAG.forEach(campo => {
+        (s[campo]||[]).forEach(tag => {
+          const key = normalizarTag(tag);
+          if (!key || key === tagLower) return;
+          const entry = counts.get(key) || { label: tag.trim(), value: 0 };
+          entry.value++;
+          counts.set(key, entry);
+        });
+      });
+    });
+    return [...counts.values()].sort((a,b) => b.value - a.value).slice(0, n);
+  }
+  function escapeHtml(str) {
+    return String(str == null ? "" : str).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+  }
+  function crearChipTag(item, onClick) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip-tag-btn";
+    btn.innerHTML = `${escapeHtml(item.label)} <span class="count">(${item.value})</span>`;
+    btn.addEventListener("click", onClick);
+    return btn;
+  }
+  function irAConexiones(tag) {
+    activarTab("conexiones");
+    document.getElementById("input-buscar-conexion").value = tag;
+    renderConexiones(tag);
+  }
+  function renderChipsTopTags() {
+    const cont = document.getElementById("chips-top-tags");
+    cont.innerHTML = "";
+    const top = [...getAllTagCounts().values()].sort((a,b) => b.value - a.value).slice(0, 20);
+    if (!top.length) {
+      const p = document.createElement("p");
+      p.className = "empty-msg";
+      p.textContent = "Todavía no hay etiquetas cargadas.";
+      cont.appendChild(p);
+      return;
+    }
+    top.forEach(t => {
+      cont.appendChild(crearChipTag(t, () => {
+        document.getElementById("input-buscar-conexion").value = t.label;
+        renderConexiones(t.label);
+      }));
+    });
+  }
+  function renderConexiones(tagInput) {
+    const card = document.getElementById("card-resultado-conexion");
+    const tagLower = normalizarTag(tagInput || "");
+    if (!tagLower) { card.style.display = "none"; return; }
+    const relacionados = suenosConTag(tagLower).sort((a,b) => (b.fecha||"").localeCompare(a.fecha||""));
+    card.style.display = "block";
+    document.getElementById("titulo-resultado-conexion").textContent = relacionados.length
+      ? `"${tagInput.trim()}" aparece en ${relacionados.length} sueño(s)`
+      : `No encontré sueños con "${tagInput.trim()}"`;
+
+    const coocCont = document.getElementById("cooc-resultado-conexion");
+    coocCont.innerHTML = "";
+    const cooc = coOcurrencias(tagLower, 12);
+    if (cooc.length) {
+      const label = document.createElement("p");
+      label.className = "hint";
+      label.style.margin = "0 0 6px";
+      label.textContent = "Suele aparecer junto con:";
+      const chipsRow = document.createElement("div");
+      chipsRow.className = "chips-inline";
+      cooc.forEach(c => chipsRow.appendChild(crearChipTag(c, () => {
+        document.getElementById("input-buscar-conexion").value = c.label;
+        renderConexiones(c.label);
+      })));
+      coocCont.append(label, chipsRow);
+    }
+
+    const listaCont = document.getElementById("lista-resultado-conexion");
+    listaCont.innerHTML = "";
+    relacionados.forEach(s => listaCont.appendChild(crearDreamCardEl(s)));
+  }
+  document.getElementById("input-buscar-conexion").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); renderConexiones(e.target.value); }
+  });
+  document.getElementById("input-buscar-conexion").addEventListener("blur", (e) => {
+    if (e.target.value.trim()) renderConexiones(e.target.value);
+  });
+
+  // ---------- Dictado por voz ----------
+  const dictadosRegistrados = [];
+  function habilitarDictado(btnId, textareaId) {
+    const btn = document.getElementById(btnId);
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) { btn.style.display = "none"; return; }
+    const estado = { recognizing: false, recognition: null };
+    dictadosRegistrados.push(estado);
+    btn.addEventListener("click", () => {
+      const textarea = document.getElementById(textareaId);
+      if (estado.recognizing && estado.recognition) { estado.recognition.stop(); return; }
+      const recognition = new SpeechRec();
+      estado.recognition = recognition;
+      recognition.lang = "es-AR";
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.onresult = (e) => {
+        let texto = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) texto += e.results[i][0].transcript;
+        }
+        texto = texto.trim();
+        if (texto) textarea.value = (textarea.value.trim() ? textarea.value.trim() + " " : "") + texto;
+      };
+      recognition.onstart = () => {
+        estado.recognizing = true; btn.textContent = "⏹️ Detener dictado"; btn.classList.add("grabando");
+        window.parent.postMessage({ tipo: "diario-suenos-dictado", activo: true }, "*");
+      };
+      recognition.onend = () => {
+        estado.recognizing = false; btn.textContent = "🎤 Dictar por voz"; btn.classList.remove("grabando");
+        window.parent.postMessage({ tipo: "diario-suenos-dictado", activo: false }, "*");
+      };
+      recognition.onerror = (e) => { console.error("Error de dictado:", e.error); };
+      recognition.start();
+    });
+  }
+  habilitarDictado("btn-dictar-texto", "campo-texto");
+  habilitarDictado("btn-dictar-notas", "campo-notas");
+
+  // ---------- Banner de constancia ----------
+  function renderBannerConstancia() {
+    const cont = document.getElementById("banner-constancia");
+    cont.innerHTML = "";
+    const fechas = state.suenos.map(s => s.fecha).filter(Boolean).sort();
+    if (!fechas.length) return;
+    const ultima = fechas[fechas.length - 1];
+    const dias = Math.floor((new Date(todayStr()+"T00:00:00") - new Date(ultima+"T00:00:00")) / (1000*60*60*24));
+    if (dias >= 3) {
+      const div = document.createElement("div");
+      div.className = "banner";
+      div.textContent = `Hace ${dias} día(s) que no anotás un sueño (el último fue el ${ultima}). Si tuviste alguno, cargalo antes de que se te olvide.`;
+      cont.appendChild(div);
+    }
+  }
+
+  // ---------- Exportar a PDF ----------
+  document.getElementById("btn-exportar-pdf").addEventListener("click", () => {
+    const ordenados = [...state.suenos].sort((a,b) => a.fecha.localeCompare(b.fecha));
+    const win = window.open("", "_blank");
+    if (!win) { alert("El navegador bloqueó la ventana de impresión. Habilitá pop-ups para este sitio e intentá de nuevo."); return; }
+    let html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Diario de Sueños</title><style>
+      body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#111;max-width:720px;margin:24px auto;padding:0 20px;line-height:1.5;}
+      h1{font-size:1.4rem;margin-bottom:0;}
+      .fecha-export{color:#666;font-size:0.85rem;margin-bottom:24px;}
+      .sueno{margin-bottom:28px;page-break-inside:avoid;border-bottom:1px solid #ddd;padding-bottom:16px;}
+      .sueno h2{font-size:1.05rem;margin:0 0 4px;}
+      .meta{color:#555;font-size:0.82rem;margin-bottom:8px;}
+      .relato{white-space:pre-wrap;font-size:0.92rem;}
+      .notas{font-style:italic;color:#444;margin-top:8px;font-size:0.85rem;}
+    </style></head><body>`;
+    html += `<h1>Diario de Sueños</h1><p class="fecha-export">Exportado el ${escapeHtml(new Date().toLocaleString("es-AR"))} — ${ordenados.length} sueño(s)</p>`;
+    ordenados.forEach(s => {
+      html += `<div class="sueno"><h2>${escapeHtml(s.fecha)} — ${escapeHtml(s.titulo || "(sin título)")}</h2>`;
+      html += `<div class="meta">${escapeHtml(TIPO_LABELS[s.tipo] || s.tipo)} · Claridad ${s.claridad}/5 · Intensidad ${s.intensidad}/5 · Fase lunar: ${escapeHtml(faseLunarSimplificada(s.fecha).label)}`;
+      if ((s.emociones||[]).length) html += ` · Emociones: ${escapeHtml(s.emociones.join(", "))}`;
+      if ((s.simbolos||[]).length) html += ` · Símbolos: ${escapeHtml(s.simbolos.join(", "))}`;
+      html += `</div><div class="relato">${escapeHtml(s.texto || "")}</div>`;
+      if (s.notas) html += `<div class="notas">Notas al despertar: ${escapeHtml(s.notas)}</div>`;
+      html += `</div>`;
+    });
+    html += `</body></html>`;
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => { try { win.focus(); win.print(); } catch(e) {} }, 300);
+  });
+
+  // ---------- Inicio ----------
+  aplicarTemaGuardado();
+  cargarEstado();
+  resetForm();
+  renderLista();
+  renderBannerConstancia();
+})();
+</script>
+</body>
+</html>

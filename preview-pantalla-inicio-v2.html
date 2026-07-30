@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preview v2 — Pantalla de inicio con scroll</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #08080f; color: #ffffff;
+  }
+  :root { --progreso: 0; }
+
+  .nota-preview {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    background: #fab219; color: #1a1a19; font-size: 0.78rem; font-weight: 600;
+    text-align: center; padding: 6px 10px;
+  }
+
+  .grano {
+    position: fixed; inset: 0; z-index: 5; pointer-events: none; opacity: 0.05; mix-blend-mode: overlay;
+  }
+
+  .controles-fijos {
+    position: fixed; top: 46px; right: 16px; z-index: 150; display: flex; gap: 8px;
+  }
+  .btn-flotante {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #fff;
+    border-radius: 999px; padding: 9px 14px; font-size: 0.82rem; cursor: pointer; font-family: inherit;
+    backdrop-filter: blur(6px);
+  }
+  .btn-flotante:hover { background: rgba(255,255,255,0.16); }
+  .btn-ayuda-flotante {
+    position: fixed; bottom: 20px; right: 16px; z-index: 150;
+    width: 46px; height: 46px; border-radius: 50%; font-size: 1.1rem;
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; cursor: pointer;
+    backdrop-filter: blur(6px);
+  }
+
+  /* ---------- Hero ---------- */
+  .hero-inicial {
+    position: relative; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 40px 20px;
+    background: radial-gradient(ellipse at 50% 20%, rgba(74,58,167,0.35), transparent 60%),
+                linear-gradient(180deg, #06060c 0%, #0d0d1c 55%, #14142a 100%);
+    overflow: hidden;
+  }
+  .estrellas { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+  .estrella { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #fff; opacity: 0.2; animation: titilar 4s ease-in-out infinite; }
+  @keyframes titilar { 0%,100% { opacity: 0.15; } 50% { opacity: 0.9; } }
+
+  .hero-inicial h1 { font-size: 2.2rem; margin: 0 0 6px; position: relative; z-index: 1; }
+  .hero-inicial .tagline { color: #c3c2b7; font-size: 1.15rem; margin: 0 0 50px; position: relative; z-index: 1; }
+
+  .scroll-indicador { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .orbe-mini {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff, #9085e9 60%, transparent 75%);
+    box-shadow: 0 0 18px 4px rgba(144,133,233,0.7);
+    animation: rebotar 1.8s ease-in-out infinite;
+  }
+  @keyframes rebotar { 0%,100% { transform: translateY(0); opacity: 0.9; } 50% { transform: translateY(14px); opacity: 0.5; } }
+  .scroll-indicador span { font-size: 0.82rem; color: #a8a7c0; }
+
+  /* ---------- Sección con scroll pineado ---------- */
+  .scroll-pin-wrap { position: relative; height: 420vh; background: linear-gradient(180deg, #14142a, #1a1430 40%, #0d0d1c); }
+  .scroll-pin-inner {
+    position: sticky; top: 0; height: 100vh;
+    display: flex; align-items: center; justify-content: center; gap: 60px;
+    flex-wrap: wrap; padding: 20px;
+  }
+
+  .escena-cabeza { position: relative; width: 300px; height: 320px; flex-shrink: 0; }
+  .orbe {
+    position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%);
+    width: calc(50px + (var(--progreso) * 140px));
+    height: calc(50px + (var(--progreso) * 140px));
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #ffffff, #cde2fb 30%, #3987e5 55%, #9085e9 75%, transparent 90%);
+    opacity: calc(0.25 + (var(--progreso) * 0.75));
+    filter: blur(calc(6px - (var(--progreso) * 4px)));
+    box-shadow: 0 0 calc(20px + var(--progreso) * 90px) calc(4px + var(--progreso) * 30px) rgba(144,133,233,0.65);
+    z-index: 1;
+    transition: filter 0.1s linear;
+  }
+  .cabeza-svg { position: relative; z-index: 2; width: 100%; height: 100%; overflow: visible; }
+  #path-base, .neck-shape { fill: #060610; }
+  #path-tapa { fill: #060610; }
+  .linea-grieta {
+    fill: none; stroke: #3987e5; stroke-width: 1.2; opacity: 0.55;
+    stroke-dasharray: 4 3;
+  }
+  #grupo-tapa { transform-origin: 60px 320px; will-change: transform; }
+
+  .textos-progresivos { position: relative; width: 100%; max-width: 380px; min-height: 160px; }
+  .bloque-texto {
+    position: absolute; top: 0; left: 0; right: 0;
+    opacity: 0; transition: opacity 0.5s ease; pointer-events: none;
+  }
+  .bloque-texto h2 { font-size: 1.5rem; margin: 0 0 10px; }
+  .bloque-texto p { color: #b3b2c8; font-size: 0.95rem; line-height: 1.55; margin: 0; }
+
+  @media (max-width: 780px) {
+    .scroll-pin-inner { flex-direction: column; justify-content: center; gap: 20px; }
+    .escena-cabeza { width: 220px; height: 240px; }
+    .textos-progresivos { text-align: center; }
+  }
+
+  /* ---------- Cierre ---------- */
+  .cierre-final {
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 40px 20px; background: #0d0d1c;
+  }
+  .cierre-final h2 { font-size: 1.6rem; max-width: 520px; margin: 0 0 28px; }
+  .botones-intro { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .btn-comenzar {
+    background: linear-gradient(135deg, #3987e5, #9085e9); color: #fff; border: none; border-radius: 999px;
+    padding: 13px 28px; font-size: 0.95rem; font-weight: 700; cursor: pointer; font-family: inherit;
+    box-shadow: 0 6px 24px rgba(90,100,220,0.4);
+  }
+  .btn-ayuda { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18); border-radius: 999px; padding: 13px 22px; font-size: 0.9rem; cursor: pointer; font-family: inherit; }
+
+  /* ---------- Modal ayuda (igual que v1) ---------- */
+  .modal-ayuda-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 300; }
+  .modal-ayuda-overlay.visible { display: flex; }
+  .modal-ayuda-box { background: #16162a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; max-width: 480px; width: 100%; padding: 26px 28px; max-height: 82vh; overflow-y: auto; }
+  .modal-ayuda-box h2 { margin: 0 0 14px; font-size: 1.2rem; }
+  .item-ayuda { margin-bottom: 14px; }
+  .item-ayuda .nombre { font-weight: 700; font-size: 0.92rem; }
+  .item-ayuda .desc { color: #b3b2c8; font-size: 0.85rem; margin-top: 2px; }
+  .btn-cerrar-ayuda { margin-top: 10px; background: rgba(255,255,255,0.1); color: #fff; border: none; border-radius: 8px; padding: 9px 16px; cursor: pointer; font-family: inherit; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<div class="nota-preview">PREVIEW v2 — scroll + sonido, todavía no conectado a la app real</div>
+<svg class="grano" width="100%" height="100%">
+  <filter id="ruido"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/></filter>
+  <rect width="100%" height="100%" filter="url(#ruido)"/>
+</svg>
+
+<div class="controles-fijos">
+  <button class="btn-flotante" id="btn-sonido">🔈 Activar sonido</button>
+</div>
+<button class="btn-ayuda-flotante" id="btn-ayuda" title="Cómo funciona">❓</button>
+
+<section class="hero-inicial">
+  <div class="estrellas" id="estrellas"></div>
+  <h1>🌙 Diario de Sueños</h1>
+  <p class="tagline">Explorá tus sueños</p>
+  <div class="scroll-indicador">
+    <div class="orbe-mini"></div>
+    <span>Deslizá hacia abajo ↓</span>
+  </div>
+</section>
+
+<section class="scroll-pin-wrap" id="scroll-wrap">
+  <div class="scroll-pin-inner">
+    <div class="escena-cabeza">
+      <div class="orbe" id="orbe"></div>
+      <svg class="cabeza-svg" viewBox="0 0 300 340">
+        <path id="path-base" d="M270,120 C282,128 286,140 280,152 C275,168 262,178 255,192
+          C248,210 235,224 218,234 C195,250 165,257 140,254 C110,250 90,237 78,217
+          C65,200 58,182 55,162 L55,125
+          C90,108 110,130 140,115 C165,102 195,118 225,105 C245,98 260,108 270,120 Z"/>
+        <path class="neck-shape" d="M118,248 C118,248 122,270 120,290 C160,300 195,298 225,286
+          C220,268 215,252 210,238 C185,250 150,252 118,248 Z"/>
+        <g id="grupo-tapa">
+          <path id="path-tapa" d="M55,125 C90,108 110,130 140,115 C165,102 195,118 225,105
+            C245,98 260,108 270,120 C260,72 222,32 165,30 C112,28 72,62 55,105 Z"/>
+        </g>
+        <path class="linea-grieta" d="M55,125 C90,108 110,130 140,115 C165,102 195,118 225,105 C245,98 260,108 270,120"/>
+      </svg>
+    </div>
+
+    <div class="textos-progresivos" id="textos">
+      <div class="bloque-texto" data-desde="0" data-hasta="0.26">
+        <h2>Registrá cada sueño</h2>
+        <p>Relato, emociones, personas, lugares y símbolos. Podés dictarlo por voz apenas te despertás.</p>
+      </div>
+      <div class="bloque-texto" data-desde="0.26" data-hasta="0.52">
+        <h2>Descubrí tu mapa personal</h2>
+        <p>Constancia a lo largo del año, tipos de sueño, y las emociones y símbolos que más se repiten.</p>
+      </div>
+      <div class="bloque-texto" data-desde="0.52" data-hasta="0.78">
+        <h2>Conectá tus propios patrones</h2>
+        <p>Elegí un símbolo o una emoción y mirá en qué otros sueños aparece.</p>
+      </div>
+      <div class="bloque-texto" data-desde="0.78" data-hasta="1.01">
+        <h2>Interpretalo con IA, cuando quieras</h2>
+        <p>Generá un prompt reflexivo, listo para pegar donde vos prefieras.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cierre-final">
+  <h2>Tu mente ya tiene mucho para mostrarte.</h2>
+  <div class="botones-intro">
+    <button class="btn-comenzar" id="btn-comenzar">Comenzar →</button>
+    <button class="btn-ayuda" id="btn-ayuda-2">❓ Cómo funciona</button>
+  </div>
+</section>
+
+<div class="modal-ayuda-overlay" id="modal-ayuda">
+  <div class="modal-ayuda-box">
+    <h2>¿Cómo funciona el Diario de Sueños?</h2>
+    <div class="item-ayuda"><div class="nombre">🌙 Nuevo sueño</div><div class="desc">Anotá cada sueño con su relato, tipo, emociones, personas, lugares y símbolos. Podés dictarlo por voz.</div></div>
+    <div class="item-ayuda"><div class="nombre">📖 Mis sueños</div><div class="desc">Todos tus sueños en una lista, con buscador y filtros.</div></div>
+    <div class="item-ayuda"><div class="nombre">🗺️ Mapa personal</div><div class="desc">Gráficos de constancia, tipos de sueño, emociones y símbolos más frecuentes.</div></div>
+    <div class="item-ayuda"><div class="nombre">🔗 Conexiones</div><div class="desc">Elegí una etiqueta y descubrí en qué otros sueños aparece y con qué se relaciona.</div></div>
+    <div class="item-ayuda"><div class="nombre">🤖 Interpretar</div><div class="desc">Generá un prompt para pedirle a una IA una lectura reflexiva de tus sueños.</div></div>
+    <div class="item-ayuda"><div class="nombre">💾 Backup</div><div class="desc">Exportá tus datos en cualquier momento — vos sos dueño de tu información.</div></div>
+    <button class="btn-cerrar-ayuda" id="btn-cerrar-ayuda">Entendido</button>
+  </div>
+</div>
+
+<script>
+  // Estrellas de fondo
+  const contEstrellas = document.getElementById("estrellas");
+  for (let i = 0; i < 40; i++) {
+    const s = document.createElement("div");
+    s.className = "estrella";
+    s.style.left = Math.random() * 100 + "%";
+    s.style.top = Math.random() * 100 + "%";
+    s.style.animationDelay = (Math.random() * 4) + "s";
+    s.style.animationDuration = (3 + Math.random() * 3) + "s";
+    contEstrellas.appendChild(s);
+  }
+
+  // Scroll: progreso de apertura de la cabeza + textos
+  const wrap = document.getElementById("scroll-wrap");
+  const grupoTapa = document.getElementById("grupo-tapa");
+  const bloques = document.querySelectorAll(".bloque-texto");
+
+  function actualizarScroll() {
+    const rect = wrap.getBoundingClientRect();
+    const total = wrap.offsetHeight - window.innerHeight;
+    let progreso = total > 0 ? -rect.top / total : 0;
+    progreso = Math.min(1, Math.max(0, progreso));
+
+    document.documentElement.style.setProperty("--progreso", progreso.toFixed(4));
+    grupoTapa.style.transform = `translate(${progreso*10}px, ${-progreso*70}px) rotate(${-progreso*22}deg)`;
+
+    bloques.forEach(b => {
+      const desde = Number(b.dataset.desde), hasta = Number(b.dataset.hasta);
+      const dentro = progreso >= desde && progreso < hasta;
+      b.style.opacity = dentro ? "1" : "0";
+      b.style.pointerEvents = dentro ? "auto" : "none";
+    });
+  }
+  window.addEventListener("scroll", () => requestAnimationFrame(actualizarScroll));
+  window.addEventListener("resize", actualizarScroll);
+  actualizarScroll();
+
+  // Ayuda (dos botones abren el mismo modal)
+  function abrirAyuda() { document.getElementById("modal-ayuda").classList.add("visible"); }
+  document.getElementById("btn-ayuda").addEventListener("click", abrirAyuda);
+  document.getElementById("btn-ayuda-2").addEventListener("click", abrirAyuda);
+  document.getElementById("btn-cerrar-ayuda").addEventListener("click", () => document.getElementById("modal-ayuda").classList.remove("visible"));
+  document.getElementById("modal-ayuda").addEventListener("click", (e) => { if (e.target.id === "modal-ayuda") e.target.classList.remove("visible"); });
+  document.getElementById("btn-comenzar").addEventListener("click", () => alert("Acá, cuando lo conectemos a la app real, pasaría a la pantalla principal del Diario de Sueños."));
+
+  // Sonido ambiente generado por código (Web Audio API) — sin archivos externos
+  let audioCtx = null, gainMaster = null, sonidoActivo = false, iniciado = false;
+  function iniciarSonido() {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    gainMaster = audioCtx.createGain();
+    gainMaster.gain.value = 0.0001;
+    gainMaster.connect(audioCtx.destination);
+
+    const frecuencias = [110, 165, 220];
+    frecuencias.forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const gainVoz = audioCtx.createGain();
+      gainVoz.gain.value = 0.4 / frecuencias.length;
+
+      const lfo = audioCtx.createOscillator();
+      lfo.frequency.value = 0.04 + i * 0.015;
+      const lfoGain = audioCtx.createGain();
+      lfoGain.gain.value = gainVoz.gain.value * 0.5;
+      lfo.connect(lfoGain);
+      lfoGain.connect(gainVoz.gain);
+
+      osc.connect(gainVoz);
+      gainVoz.connect(gainMaster);
+      osc.start();
+      lfo.start();
+    });
+    gainMaster.gain.linearRampToValueAtTime(0.055, audioCtx.currentTime + 2.5);
+    iniciado = true;
+    sonidoActivo = true;
+  }
+  document.getElementById("btn-sonido").addEventListener("click", (e) => {
+    if (!iniciado) {
+      iniciarSonido();
+      e.target.textContent = "🔊 Silenciar";
+      return;
+    }
+    sonidoActivo = !sonidoActivo;
+    const objetivo = sonidoActivo ? 0.055 : 0.0001;
+    gainMaster.gain.linearRampToValueAtTime(objetivo, audioCtx.currentTime + 0.6);
+    e.target.textContent = sonidoActivo ? "🔊 Silenciar" : "🔈 Activar sonido";
+  });
+</script>
+</body>
+</html>

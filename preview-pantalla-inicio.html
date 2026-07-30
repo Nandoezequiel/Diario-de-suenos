@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preview — Pantalla de inicio</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100vh;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #0d0d14; color: #ffffff; overflow-x: hidden;
+  }
+
+  .nota-preview {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    background: #fab219; color: #1a1a19; font-size: 0.8rem; font-weight: 600;
+    text-align: center; padding: 6px 10px;
+  }
+
+  .intro-screen {
+    position: relative;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    padding: 70px 20px 40px;
+    background:
+      radial-gradient(ellipse at 50% 30%, rgba(74,58,167,0.35), transparent 60%),
+      linear-gradient(180deg, #0a0a16 0%, #14142a 45%, #1a1430 100%);
+    overflow: hidden;
+  }
+
+  .estrellas { position: absolute; inset: 0; pointer-events: none; }
+  .estrella {
+    position: absolute; width: 3px; height: 3px; border-radius: 50%;
+    background: #ffffff; opacity: 0.2;
+    animation: titilar 4s ease-in-out infinite;
+  }
+  @keyframes titilar {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.9; }
+  }
+
+  .figura-wrap {
+    position: relative;
+    width: 260px; height: 320px;
+    display: flex; align-items: flex-end; justify-content: center;
+    margin-bottom: 8px;
+  }
+
+  .holograma {
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 190px; height: 190px;
+    border-radius: 48% 52% 55% 45% / 55% 45% 55% 45%;
+    background: conic-gradient(from 0deg, #3987e5, #9085e9, #d55181, #3987e5);
+    filter: blur(2px);
+    opacity: 0.55;
+    overflow: hidden;
+    animation: pulsoHolograma 4.5s ease-in-out infinite;
+  }
+  .holograma::after {
+    content: ""; position: absolute; left: -20%; right: -20%; height: 40%;
+    background: linear-gradient(180deg, transparent, rgba(255,255,255,0.35), transparent);
+    animation: escaneo 3s linear infinite;
+  }
+  @keyframes pulsoHolograma {
+    0%, 100% { transform: translateX(-50%) scale(1) rotate(0deg); opacity: 0.45; }
+    50% { transform: translateX(-50%) scale(1.08) rotate(6deg); opacity: 0.65; }
+  }
+  @keyframes escaneo {
+    0% { top: -50%; }
+    100% { top: 110%; }
+  }
+
+  .particula {
+    position: absolute; font-size: 1.1rem; color: #cde2fb; text-shadow: 0 0 8px rgba(150,180,255,0.8);
+    animation: flotar 5s ease-in-out infinite;
+  }
+  .p1 { top: 10px;  left: 30px;  animation-duration: 5.5s; animation-delay: 0s; }
+  .p2 { top: 40px;  right: 20px; animation-duration: 4.8s; animation-delay: 0.6s; font-size: 1.4rem; }
+  .p3 { top: 100px; left: 5px;   animation-duration: 6.2s; animation-delay: 1.1s; }
+  .p4 { top: 120px; right: 0px;  animation-duration: 5s;   animation-delay: 0.3s; font-size: 0.85rem; }
+  @keyframes flotar {
+    0%, 100% { transform: translateY(0px); opacity: 0.6; }
+    50% { transform: translateY(-14px); opacity: 1; }
+  }
+
+  .silueta { position: relative; z-index: 2; width: 190px; height: auto; }
+  .silueta path { fill: #05050a; }
+
+  .titulo-intro, .tagline, .descripcion-intro, .botones-intro {
+    opacity: 0; transform: translateY(16px);
+    animation: aparecer 0.7s ease forwards;
+  }
+  .titulo-intro { font-size: 1.9rem; margin: 6px 0 4px; letter-spacing: -0.01em; animation-delay: 0.15s; text-align: center; }
+  .tagline { color: #c3c2b7; font-size: 1rem; margin: 0 0 14px; animation-delay: 0.35s; text-align: center; }
+  .descripcion-intro {
+    max-width: 480px; text-align: center; color: #a8a7c0; font-size: 0.9rem; line-height: 1.55;
+    margin: 0 0 26px; animation-delay: 0.55s;
+  }
+  .botones-intro { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; animation-delay: 0.75s; }
+  @keyframes aparecer { to { opacity: 1; transform: translateY(0); } }
+
+  .btn-comenzar {
+    background: linear-gradient(135deg, #3987e5, #9085e9);
+    color: #fff; border: none; border-radius: 999px; padding: 13px 28px;
+    font-size: 0.95rem; font-weight: 700; cursor: pointer; font-family: inherit;
+    box-shadow: 0 6px 24px rgba(90,100,220,0.4);
+  }
+  .btn-comenzar:hover { filter: brightness(1.1); }
+  .btn-ayuda {
+    background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 999px; padding: 13px 22px; font-size: 0.9rem; cursor: pointer; font-family: inherit;
+  }
+  .btn-ayuda:hover { background: rgba(255,255,255,0.15); }
+
+  .modal-ayuda-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none;
+    align-items: center; justify-content: center; padding: 20px; z-index: 100;
+  }
+  .modal-ayuda-overlay.visible { display: flex; }
+  .modal-ayuda-box {
+    background: #16162a; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+    max-width: 480px; width: 100%; padding: 26px 28px; max-height: 82vh; overflow-y: auto;
+  }
+  .modal-ayuda-box h2 { margin: 0 0 14px; font-size: 1.2rem; }
+  .modal-ayuda-box .item-ayuda { margin-bottom: 14px; }
+  .modal-ayuda-box .item-ayuda .nombre { font-weight: 700; font-size: 0.92rem; }
+  .modal-ayuda-box .item-ayuda .desc { color: #b3b2c8; font-size: 0.85rem; margin-top: 2px; }
+  .modal-ayuda-box .btn-cerrar-ayuda {
+    margin-top: 10px; background: rgba(255,255,255,0.1); color: #fff; border: none;
+    border-radius: 8px; padding: 9px 16px; cursor: pointer; font-family: inherit; font-size: 0.85rem;
+  }
+
+  @media (max-width: 480px) {
+    .figura-wrap { width: 200px; height: 250px; }
+    .holograma { width: 150px; height: 150px; }
+    .silueta { width: 150px; }
+    .titulo-intro { font-size: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="nota-preview">PREVIEW — esto todavía no está conectado a la app real, es solo para ver el diseño</div>
+
+<div class="intro-screen">
+  <div class="estrellas" id="estrellas"></div>
+
+  <div class="figura-wrap">
+    <div class="holograma"></div>
+    <span class="particula p1">✦</span>
+    <span class="particula p2">☾</span>
+    <span class="particula p3">✧</span>
+    <span class="particula p4">z</span>
+    <svg class="silueta" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
+      <path d="M100,14 C128,14 148,38 148,66 C148,84 141,98 130,108
+               C162,119 187,148 192,208 L8,208
+               C13,148 38,119 70,108 C59,98 52,84 52,66 C52,38 72,14 100,14 Z"/>
+    </svg>
+  </div>
+
+  <h1 class="titulo-intro">🌙 Diario de Sueños</h1>
+  <p class="tagline">Poné en palabras lo que soñás. Con el tiempo, vas a ver tu propio mapa.</p>
+  <p class="descripcion-intro">
+    Una libreta personal para tus sueños: registralos con emociones, símbolos, personas y lugares;
+    mirá un mapa de tus patrones a lo largo del tiempo; explorá conexiones entre tus propios sueños;
+    y apoyate en una IA para interpretarlos cuando quieras. Todo se guarda en tu navegador —
+    sin cuentas, sin servidores, sin que nadie más lo vea.
+  </p>
+  <div class="botones-intro">
+    <button class="btn-comenzar" id="btn-comenzar">Comenzar →</button>
+    <button class="btn-ayuda" id="btn-ayuda">❓ Cómo funciona</button>
+  </div>
+</div>
+
+<div class="modal-ayuda-overlay" id="modal-ayuda">
+  <div class="modal-ayuda-box">
+    <h2>¿Cómo funciona el Diario de Sueños?</h2>
+    <div class="item-ayuda">
+      <div class="nombre">🌙 Nuevo sueño</div>
+      <div class="desc">Anotá cada sueño con su relato, tipo, emociones, personas, lugares y símbolos. Podés dictarlo por voz.</div>
+    </div>
+    <div class="item-ayuda">
+      <div class="nombre">📖 Mis sueños</div>
+      <div class="desc">Todos tus sueños en una lista, con buscador y filtros.</div>
+    </div>
+    <div class="item-ayuda">
+      <div class="nombre">🗺️ Mapa personal</div>
+      <div class="desc">Gráficos de constancia, tipos de sueño, emociones y símbolos más frecuentes.</div>
+    </div>
+    <div class="item-ayuda">
+      <div class="nombre">🔗 Conexiones</div>
+      <div class="desc">Elegí una etiqueta y descubrí en qué otros sueños aparece y con qué se relaciona.</div>
+    </div>
+    <div class="item-ayuda">
+      <div class="nombre">🤖 Interpretar</div>
+      <div class="desc">Generá un prompt para pedirle a una IA una lectura reflexiva de tus sueños.</div>
+    </div>
+    <div class="item-ayuda">
+      <div class="nombre">💾 Backup</div>
+      <div class="desc">Exportá tus datos en cualquier momento — vos sos dueño de tu información.</div>
+    </div>
+    <button class="btn-cerrar-ayuda" id="btn-cerrar-ayuda">Entendido</button>
+  </div>
+</div>
+
+<script>
+  const cont = document.getElementById("estrellas");
+  for (let i = 0; i < 40; i++) {
+    const s = document.createElement("div");
+    s.className = "estrella";
+    s.style.left = Math.random() * 100 + "%";
+    s.style.top = Math.random() * 100 + "%";
+    s.style.animationDelay = (Math.random() * 4) + "s";
+    s.style.animationDuration = (3 + Math.random() * 3) + "s";
+    cont.appendChild(s);
+  }
+  document.getElementById("btn-ayuda").addEventListener("click", () => {
+    document.getElementById("modal-ayuda").classList.add("visible");
+  });
+  document.getElementById("btn-cerrar-ayuda").addEventListener("click", () => {
+    document.getElementById("modal-ayuda").classList.remove("visible");
+  });
+  document.getElementById("modal-ayuda").addEventListener("click", (e) => {
+    if (e.target.id === "modal-ayuda") e.target.classList.remove("visible");
+  });
+  document.getElementById("btn-comenzar").addEventListener("click", () => {
+    alert("Acá, cuando lo conectemos a la app real, pasaría a la pantalla principal del Diario de Sueños.");
+  });
+</script>
+</body>
+</html>
