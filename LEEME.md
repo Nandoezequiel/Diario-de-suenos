@@ -23,15 +23,17 @@ Los sueños se guardan en el `localStorage` del navegador donde abriste el archi
 
 ## Las pestañas
 
-1. **Nuevo sueño** — formulario para cargar un sueño: fecha (con la fase lunar de ese día calculada automáticamente), título, relato, tipo (normal/lúcido/pesadilla/recurrente/**viaje astral**), claridad del recuerdo, intensidad emocional, y etiquetas de emociones, personas, lugares y símbolos (se escriben y se agregan con Enter, o con los emojis de un click para emociones). Arriba aparece un aviso si hace 3 días o más que no cargás un sueño. El relato y las notas al despertar tienen un botón **🎤 Dictar por voz** (ver sección aparte).
-   - **Modo carga rápida**: un checkbox arriba del formulario oculta claridad/intensidad, personas, lugares y notas, para anotar solo lo esencial medio dormido y completar el resto después editando el sueño.
+1. **Nuevo sueño** — arriba del formulario hay una tarjeta de consejo explicando cómo aprovechar mejor la interpretación posterior, y un desplegable **"Mi contexto personal"** (opcional, se completa una sola vez): rasgos que te definen a largo plazo (edad, hijos, familia, vínculos, pérdidas que te marcaron) — no cosas pasajeras, esas van en "Contexto reciente". Se guarda para siempre y se suma automáticamente a todo prompt de interpretación que generes.
+   Formulario para cargar un sueño: fecha (con la fase lunar de ese día calculada automáticamente), título (si lo dejás vacío, se genera uno automático a partir de los símbolos/lugares/personas/palabras clave del relato), relato, tipo (normal/lúcido/pesadilla/recurrente/**viaje astral**), claridad del recuerdo, intensidad emocional, etiquetas de emociones, personas, lugares y símbolos (se escriben y se agregan con Enter, o con los emojis de un click para emociones), **Contexto reciente** (opcional — qué te pasó en los días previos al sueño, que puede haber influido) y notas al despertar. Arriba aparece un aviso si hace 3 días o más que no cargás un sueño. El relato, el contexto reciente y las notas al despertar tienen un botón **🎤 Dictar por voz** (ver sección aparte).
+   - **Modo carga rápida**: un checkbox arriba del formulario oculta claridad/intensidad, personas, lugares, contexto reciente y notas, para anotar solo lo esencial medio dormido y completar el resto después editando el sueño.
    - **Diccionario de símbolos**: al escribir en el campo de símbolos, si coincide con un símbolo conocido (agua, volar, dientes, caída, etc.) aparece una lectura tradicional de referencia debajo del campo. Esa misma lectura se muestra también en el detalle del sueño y se suma como contexto extra al generar el prompt de interpretación — siempre aclarando que es una lectura simbólica de referencia, no un diagnóstico.
    - **Sugerencia de etiquetas desde el relato**: al terminar de escribir el relato (al salir del campo), la app sugiere palabras repetidas del texto como posibles símbolos, para agregarlas con un click.
 2. **Mis sueños** — listado de todo lo cargado, con buscador y filtros por tipo y rango de fechas. Click en un sueño para ver el detalle completo, editarlo o eliminarlo.
 3. **Mapa personal** — el panel de patrones: total registrado, racha de días consecutivos, % de sueños lúcidos; un **calendario de constancia** estilo "mapa de contribuciones" (un cuadrito por día del último año, más oscuro cuantos más sueños anotaste ese día); sueños por semana (últimas 12 semanas); tipos de sueño; sueños por fase lunar; y las emociones y símbolos que más se repiten (hacé click en una barra de emociones o símbolos para saltar directo al explorador de conexiones con esa etiqueta).
 4. **Conexiones** — el explorador: elegís una etiqueta (emoción, persona, lugar o símbolo) escribiéndola o haciendo click en una de las más frecuentes, y ves todos los sueños donde aparece, más las otras etiquetas con las que más suele aparecer junto (esas también son clickeables, para seguir explorando de una a otra).
-5. **Interpretar** — elegís qué sueños incluir (los que todavía no interpretaste, los últimos N días, un rango de fechas, o todos) y la app arma un **prompt en texto** listo para copiar y pegar en Claude (u otra IA). El prompt pide una lectura reflexiva y no clínica, buscando patrones y símbolos recurrentes. Después de pegarlo en la IA y tener la respuesta, la podés pegar de vuelta acá para guardarla asociada a esos sueños — queda en el historial y también se ve en el detalle de cada sueño incluido.
-6. **Backup** — exportar/importar, más **exportar a PDF** (abre una ventana de impresión con todos los sueños; desde ahí elegís "Guardar como PDF" como destino de impresión).
+5. **Interpretar** — elegís qué sueños incluir (los que todavía no interpretaste, los últimos N días, un rango de fechas, o todos) y la app arma un **prompt en texto** listo para copiar y pegar en Claude (u otra IA), incluyendo tu contexto personal y el contexto reciente de cada sueño si los completaste. El prompt pide una lectura reflexiva y no clínica, buscando patrones y símbolos recurrentes. Después de pegarlo en la IA y tener la respuesta, la podés pegar de vuelta acá para guardarla asociada a esos sueños — queda en el historial y también se ve en el detalle de cada sueño incluido. También podés entrar a esta pestaña directo desde el detalle de un sueño puntual, con el botón **"Interpretar este sueño"** (o "Agregar otra interpretación" si ya tiene alguna) — así no dependés de generar el prompt y pegar la respuesta en la misma sesión: podés volver cuando quieras.
+6. **Backup** — exportar/importar, más **exportar a PDF** (abre una ventana de impresión con todos los sueños; desde ahí elegís "Guardar como PDF" como destino de impresión). El JSON incluye todo: sueños, interpretaciones, contexto personal y contexto reciente de cada sueño.
+7. **Cuenta** (opcional) — ver sección aparte "Cuenta en la nube".
 
 ## Dictado por voz
 
@@ -51,6 +53,21 @@ Sobre el sonido — reglas que sigue, por si hay que tocarlas en el futuro:
 
 Se eligió así a propósito: sin necesidad de una API key propia ni costo por uso, con control total sobre qué IA usar y cuándo. Si en algún momento se quiere automatizar (por ejemplo, un botón que llame directamente a la API de Claude), es una ampliación posible sobre esta misma base — avisale a Claude Code para que lo agregue.
 
+## Cuenta en la nube (opcional)
+
+La pestaña "Cuenta" permite crear una cuenta (email + contraseña) para tener un backup en la nube y poder bajar tus datos en otro dispositivo — **100% opcional**: sin cuenta, la app sigue funcionando exactamente igual, guardando todo solo en este navegador. No hay sincronización automática: "Subir mis datos" y "Bajar mis datos" son acciones manuales, como exportar/importar un archivo pero contra tu cuenta. "Subir" nunca borra lo que ya había en la nube (lo une con lo local); "Bajar" te deja elegir si reemplazar o fusionar con lo que tenés localmente.
+
+Esta función usa [Supabase](https://supabase.com) (gratis en su plan Hobby) como backend. Mientras no se configure, la pestaña Cuenta muestra "no disponible" y el resto de la app no se ve afectado en nada.
+
+**Para activarla** (solo hace falta una vez):
+1. Crear una cuenta gratis en supabase.com y un proyecto nuevo.
+2. En *Project Settings → API*, copiar el **Project URL** y la clave **`anon`/`public`** (nunca la `service_role`, esa es secreta).
+3. Pegar esos dos valores en las constantes `SUPABASE_URL` y `SUPABASE_ANON_KEY`, cerca del principio del `<script>` de `diario-de-suenos.html`.
+4. Correr en el *SQL Editor* del proyecto el SQL que crea la tabla `datos_usuario` y sus políticas de seguridad (Row Level Security) — pedíselo a Claude Code si no lo tenés a mano, quedó documentado en el historial del proyecto.
+5. En *Authentication*, desactivar "Confirm email" (así el login es inmediato, sin tener que verificar el correo).
+
+La seguridad acá no depende de "esconder" el código JS (eso no es posible en ninguna web) — depende de que la `anon key` es segura de exponer en el cliente por diseño, y de que las políticas de Row Level Security de Supabase impiden que un usuario lea o escriba los datos de otro, sin importar qué intente desde el navegador.
+
 ## Privacidad
 
-Todo el contenido queda en tu navegador y en los archivos que vos exportes — no se manda a ningún servidor. Los relatos de sueños suelen ser información personal/sensible: si alguna vez compartís un backup o una exportación, tené en cuenta qué hay adentro.
+Todo el contenido queda en tu navegador y en los archivos que vos exportes — no se manda a ningún servidor. Los relatos de sueños suelen ser información personal/sensible: si alguna vez compartís un backup o una exportación, tené en cuenta qué hay adentro. Si activás la cuenta en la nube (opcional, ver sección anterior), esos mismos datos también quedan guardados en tu cuenta de Supabase, protegidos por tu contraseña — no compartas tu cuenta con otras personas.
