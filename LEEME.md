@@ -55,9 +55,11 @@ Se eligió así a propósito: sin necesidad de una API key propia ni costo por u
 
 ## Cuenta en la nube (opcional)
 
-La pestaña "Cuenta" permite crear una cuenta (email + contraseña) para tener un backup en la nube y poder bajar tus datos en otro dispositivo — **100% opcional**: sin cuenta, la app sigue funcionando exactamente igual, guardando todo solo en este navegador. No hay sincronización automática: "Subir mis datos" y "Bajar mis datos" son acciones manuales, como exportar/importar un archivo pero contra tu cuenta. "Subir" nunca borra lo que ya había en la nube (lo une con lo local); "Bajar" te deja elegir si reemplazar o fusionar con lo que tenés localmente.
+La pestaña "Cuenta" permite crear una cuenta (email + contraseña) para tener un backup en la nube y poder descargar tus datos en otro dispositivo — **100% opcional**: sin cuenta, la app sigue funcionando exactamente igual, guardando todo solo en este navegador. No hay sincronización automática: "Guardar en la nube" y "Descargar de la nube" son acciones manuales, como exportar/importar un archivo pero contra tu cuenta. "Guardar" nunca borra lo que ya había en la nube (lo une con lo local); "Descargar" te deja elegir si reemplazar o fusionar con lo que tenés localmente.
 
 Esta función usa [Supabase](https://supabase.com) (gratis en su plan Hobby) como backend. Mientras no se configure, la pestaña Cuenta muestra "no disponible" y el resto de la app no se ve afectado en nada.
+
+Una vez configurada, la primera vez que alguien abre la app sin sesión iniciada aparece una pantalla de bienvenida invitando a crear cuenta (con "Continuar sin cuenta" siempre visible y sin fricción). Se muestra una sola vez por dispositivo — si se elige continuar sin cuenta, no vuelve a aparecer sola; para crear cuenta más adelante, el botón sigue disponible desde la pestaña Cuenta.
 
 **Para activarla** (solo hace falta una vez):
 1. Crear una cuenta gratis en supabase.com y un proyecto nuevo.
