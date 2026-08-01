@@ -1112,6 +1112,7 @@
       if (confirm("¿Eliminar este sueño? Esta acción no se puede deshacer.")) {
         state.suenos = state.suenos.filter(x => x.id !== s.id);
         guardarEstado();
+        guardarEnNubeSilencioso(s.id);
         cerrarModal();
         renderLista();
       }
@@ -1768,15 +1769,17 @@
     try { await sb.auth.signOut(); } catch (e) { /* ya se cierra localmente igual */ }
   }
 
-  async function guardarDatosEnNube() {
+  async function guardarDatosEnNube(idAEliminarDeNube) {
     if (!sb || !sesionActual) return { ok: false, mensaje: "No hay sesión iniciada." };
     try {
       const { data, error: errLectura } = await sb.from("datos_usuario")
         .select("datos").eq("user_id", sesionActual.user.id).maybeSingle();
       if (errLectura) return { ok: false, mensaje: "No se pudo verificar los datos en la nube: " + errLectura.message };
-      const datosAEnviar = (data && data.datos && Array.isArray(data.datos.suenos))
-        ? unirEstados(state, data.datos)
-        : state;
+      let datosNube = (data && data.datos && Array.isArray(data.datos.suenos)) ? data.datos : null;
+      if (datosNube && idAEliminarDeNube) {
+        datosNube = { ...datosNube, suenos: datosNube.suenos.filter(s => s.id !== idAEliminarDeNube) };
+      }
+      const datosAEnviar = datosNube ? unirEstados(state, datosNube) : state;
       const { error } = await sb.from("datos_usuario")
         .upsert({ user_id: sesionActual.user.id, datos: datosAEnviar }, { onConflict: "user_id" });
       if (error) return { ok: false, mensaje: "No se pudo guardar: " + error.message };
@@ -1794,9 +1797,9 @@
     alert("Datos guardados en la nube.");
   }
 
-  async function guardarEnNubeSilencioso() {
+  async function guardarEnNubeSilencioso(idAEliminarDeNube) {
     if (!sb || !sesionActual) return;
-    const resultado = await guardarDatosEnNube();
+    const resultado = await guardarDatosEnNube(idAEliminarDeNube);
     if (!resultado.ok) console.warn("Guardado automático en la nube falló:", resultado.mensaje);
   }
 
