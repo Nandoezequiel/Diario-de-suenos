@@ -88,6 +88,7 @@
   .card-consejo ul { margin: 8px 0; padding-left: 20px; }
   .card-consejo li { margin-bottom: 5px; font-size: 0.92rem; }
   .card-contexto summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; }
+  .link-btn { background:none; border:none; padding:0; color: var(--blue); text-decoration: underline; cursor:pointer; font: inherit; }
 
   label.field-label { display:block; font-size: 0.82rem; color: var(--text-sec); margin-bottom: 4px; font-weight: 600; }
   .field { margin-bottom: 14px; }
@@ -571,41 +572,51 @@
     <h2 style="margin-top:0;">Guardá tus sueños para siempre</h2>
     <p class="hint">Crear una cuenta es completamente opcional — el diario funciona igual sin ella, guardando todo en este dispositivo. Pero si algún día cambiás de celular, de PC, o el navegador borra sus datos, con una cuenta vas a poder recuperar todos tus sueños tal cual los dejaste. Nada se guarda en la nube sin que vos lo pidas explícitamente desde la pestaña Cuenta.</p>
 
-    <h3 style="margin-top:18px;">Crear cuenta</h3>
-    <form id="form-registro">
-      <div class="field">
-        <label class="field-label">Email</label>
-        <input type="email" id="registro-email" required>
-      </div>
-      <div class="field">
-        <label class="field-label">Contraseña</label>
-        <input type="password" id="registro-password" required minlength="6">
-      </div>
-      <div class="field">
-        <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.85rem; color:var(--text-sec); cursor:pointer;">
-          <input type="checkbox" id="registro-acepto" required style="margin-top:3px;">
-          <span>Entiendo que crear una cuenta es opcional, que mis sueños pueden ser información sensible, que soy responsable de no compartir mi cuenta, y acepto que se guarde mi email y mi contraseña (hasheada) para poder guardar y descargar mis datos.</span>
-        </label>
-      </div>
-      <div class="btn-row">
-        <button type="submit" class="btn">Crear cuenta</button>
-      </div>
-    </form>
+    <div id="vista-registro">
+      <h3 style="margin-top:18px;">Crear cuenta</h3>
+      <form id="form-registro">
+        <div class="field">
+          <label class="field-label">Nombre (opcional)</label>
+          <input type="text" id="registro-nombre" placeholder="Cómo querés que te llamemos">
+        </div>
+        <div class="field">
+          <label class="field-label">Email</label>
+          <input type="email" id="registro-email" required>
+        </div>
+        <div class="field">
+          <label class="field-label">Contraseña</label>
+          <input type="password" id="registro-password" required minlength="6">
+        </div>
+        <div class="field">
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:0.85rem; color:var(--text-sec); cursor:pointer;">
+            <input type="checkbox" id="registro-acepto" required style="margin-top:3px;">
+            <span>Entiendo que crear una cuenta es opcional, que mis sueños pueden ser información sensible, que soy responsable de no compartir mi cuenta, y acepto que se guarde mi email y mi contraseña (hasheada) para poder guardar y descargar mis datos.</span>
+          </label>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn">Crear cuenta</button>
+        </div>
+      </form>
+      <p class="hint" style="margin-top:10px;">¿Ya tenés cuenta? <button type="button" class="link-btn" id="btn-ir-a-login">Iniciar sesión</button></p>
+    </div>
 
-    <h3 style="margin-top:22px;">Ya tengo cuenta</h3>
-    <form id="form-login">
-      <div class="field">
-        <label class="field-label">Email</label>
-        <input type="email" id="login-email" required>
-      </div>
-      <div class="field">
-        <label class="field-label">Contraseña</label>
-        <input type="password" id="login-password" required>
-      </div>
-      <div class="btn-row">
-        <button type="submit" class="btn secondary">Iniciar sesión</button>
-      </div>
-    </form>
+    <div id="vista-login" style="display:none;">
+      <h3 style="margin-top:18px;">Iniciar sesión</h3>
+      <form id="form-login">
+        <div class="field">
+          <label class="field-label">Email</label>
+          <input type="email" id="login-email" required>
+        </div>
+        <div class="field">
+          <label class="field-label">Contraseña</label>
+          <input type="password" id="login-password" required>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn">Iniciar sesión</button>
+        </div>
+      </form>
+      <p class="hint" style="margin-top:10px;">¿No tenés cuenta? <button type="button" class="link-btn" id="btn-ir-a-registro">Crear una</button></p>
+    </div>
 
     <div class="btn-row" style="margin-top:22px; border-top:1px solid var(--border); padding-top:16px;">
       <button type="button" class="btn secondary" id="btn-continuar-sin-cuenta">Continuar sin cuenta</button>
@@ -625,8 +636,8 @@
   // ---------- Config de Supabase (opcional) ----------
   // Si estas dos constantes quedan con el valor "TODO...", la app funciona
   // igual 100% local: la pestaña Cuenta se muestra como "no disponible".
-  const SUPABASE_URL = "TODO_PEGAR_URL_DE_TU_PROYECTO_SUPABASE";
-  const SUPABASE_ANON_KEY = "TODO_PEGAR_ANON_KEY_DE_TU_PROYECTO_SUPABASE";
+  const SUPABASE_URL = "https://fssaxzfztjxvwnpbiivk.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzc2F4emZ6dGp4dnducGJpaXZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1OTM4NDksImV4cCI6MjEwMTE2OTg0OX0.uPmhN4ArGVM367pTTmsMD-MYF7YVl6iShtIQjrml08c";
   const CLOUD_UPLOAD_KEY = "diario_suenos_ultima_subida_nube";
   const CLOUD_DOWNLOAD_KEY = "diario_suenos_ultima_bajada_nube";
   const GATE_DISMISS_KEY = "diario_suenos_gate_cuenta_visto";
@@ -1666,7 +1677,10 @@
     if (sesionActual && sesionActual.user) {
       anonimo.style.display = "none";
       logueado.style.display = "block";
-      document.getElementById("texto-sesion-actual").textContent = `Sesión iniciada como ${sesionActual.user.email}.`;
+      const nombre = sesionActual.user.user_metadata && sesionActual.user.user_metadata.nombre;
+      document.getElementById("texto-sesion-actual").textContent = nombre
+        ? `Sesión iniciada como ${nombre} (${sesionActual.user.email}).`
+        : `Sesión iniciada como ${sesionActual.user.email}.`;
       const ultimaSubida = localStorage.getItem(CLOUD_UPLOAD_KEY);
       const ultimaBajada = localStorage.getItem(CLOUD_DOWNLOAD_KEY);
       const partes = [];
@@ -1680,11 +1694,21 @@
   }
 
   function mostrarGateCuenta() {
+    document.getElementById("vista-registro").style.display = "block";
+    document.getElementById("vista-login").style.display = "none";
     document.getElementById("gate-cuenta").style.display = "flex";
   }
   function ocultarGateCuenta() {
     document.getElementById("gate-cuenta").style.display = "none";
   }
+  document.getElementById("btn-ir-a-login").addEventListener("click", () => {
+    document.getElementById("vista-registro").style.display = "none";
+    document.getElementById("vista-login").style.display = "block";
+  });
+  document.getElementById("btn-ir-a-registro").addEventListener("click", () => {
+    document.getElementById("vista-login").style.display = "none";
+    document.getElementById("vista-registro").style.display = "block";
+  });
   document.getElementById("btn-continuar-sin-cuenta").addEventListener("click", () => {
     localStorage.setItem(GATE_DISMISS_KEY, "1");
     ocultarGateCuenta();
@@ -1716,9 +1740,10 @@
     });
   }
 
-  async function registrarUsuario(email, password) {
+  async function registrarUsuario(email, password, nombre) {
     if (!sb) return;
-    const { error } = await sb.auth.signUp({ email, password });
+    const opciones = nombre ? { data: { nombre } } : undefined;
+    const { error } = await sb.auth.signUp({ email, password, options: opciones });
     if (error) { alert(traducirErrorAuth(error)); return; }
   }
 
@@ -1767,8 +1792,9 @@
     e.preventDefault();
     const email = document.getElementById("registro-email").value.trim();
     const password = document.getElementById("registro-password").value;
+    const nombre = document.getElementById("registro-nombre").value.trim();
     if (!document.getElementById("registro-acepto").checked) { alert("Tenés que aceptar el texto de privacidad para crear la cuenta."); return; }
-    await registrarUsuario(email, password);
+    await registrarUsuario(email, password, nombre);
     e.target.reset();
   });
 
