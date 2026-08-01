@@ -55,7 +55,9 @@ Se eligió así a propósito: sin necesidad de una API key propia ni costo por u
 
 ## Cuenta en la nube (opcional)
 
-La pestaña "Cuenta" permite crear una cuenta (email + contraseña) para tener un backup en la nube y poder descargar tus datos en otro dispositivo — **100% opcional**: sin cuenta, la app sigue funcionando exactamente igual, guardando todo solo en este navegador. No hay sincronización automática: "Guardar en la nube" y "Descargar de la nube" son acciones manuales, como exportar/importar un archivo pero contra tu cuenta. "Guardar" nunca borra lo que ya había en la nube (lo une con lo local); "Descargar" te deja elegir si reemplazar o fusionar con lo que tenés localmente.
+La pestaña "Cuenta" permite crear una cuenta (email + contraseña) para tener un backup en la nube y poder descargar tus datos en otro dispositivo — **100% opcional**: sin cuenta, la app sigue funcionando exactamente igual, guardando todo solo en este navegador.
+
+Si tenés sesión iniciada, cada vez que guardás un sueño o una interpretación, la app también los sube solo a la nube en segundo plano, sin cartelitos ni interrupciones (nunca borra lo que ya había ahí, lo une con lo local). El botón **"Guardar en la nube"** de la pestaña Cuenta sigue estando por si querés forzarlo a mano. La **descarga** ("Descargar de la nube") es la única acción que queda 100% manual y explícita — te deja elegir si reemplazar o fusionar con lo que tenés localmente, porque es un paso que conviene decidir a conciencia.
 
 Esta función usa [Supabase](https://supabase.com) (gratis en su plan Hobby) como backend. Mientras no se configure, la pestaña Cuenta muestra "no disponible" y el resto de la app no se ve afectado en nada.
 
