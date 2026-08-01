@@ -967,6 +967,7 @@
       state.suenos.push(sueno);
     }
     guardarEstado();
+    guardarEnNubeSilencioso();
     resetForm();
     activarTab("lista");
   });
@@ -1501,6 +1502,7 @@
       if (found) found.interpretado = true;
     });
     guardarEstado();
+    guardarEnNubeSilencioso();
     idInterpretacionForzada = null;
     document.getElementById("respuesta-ia").value = "";
     document.getElementById("bloque-prompt").style.display = "none";
@@ -1742,50 +1744,78 @@
 
   async function registrarUsuario(email, password, nombre) {
     if (!sb) return;
-    const opciones = nombre ? { data: { nombre } } : undefined;
-    const { error } = await sb.auth.signUp({ email, password, options: opciones });
-    if (error) { alert(traducirErrorAuth(error)); return; }
+    try {
+      const opciones = nombre ? { data: { nombre } } : undefined;
+      const { error } = await sb.auth.signUp({ email, password, options: opciones });
+      if (error) { alert(traducirErrorAuth(error)); return; }
+    } catch (e) {
+      alert("No se pudo conectar con el servidor. Revisá tu conexión a internet.");
+    }
   }
 
   async function iniciarSesion(email, password) {
     if (!sb) return;
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) { alert(traducirErrorAuth(error)); return; }
+    try {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) { alert(traducirErrorAuth(error)); return; }
+    } catch (e) {
+      alert("No se pudo conectar con el servidor. Revisá tu conexión a internet.");
+    }
   }
 
   async function cerrarSesion() {
     if (!sb) return;
-    await sb.auth.signOut();
+    try { await sb.auth.signOut(); } catch (e) { /* ya se cierra localmente igual */ }
+  }
+
+  async function guardarDatosEnNube() {
+    if (!sb || !sesionActual) return { ok: false, mensaje: "No hay sesión iniciada." };
+    try {
+      const { data, error: errLectura } = await sb.from("datos_usuario")
+        .select("datos").eq("user_id", sesionActual.user.id).maybeSingle();
+      if (errLectura) return { ok: false, mensaje: "No se pudo verificar los datos en la nube: " + errLectura.message };
+      const datosAEnviar = (data && data.datos && Array.isArray(data.datos.suenos))
+        ? unirEstados(state, data.datos)
+        : state;
+      const { error } = await sb.from("datos_usuario")
+        .upsert({ user_id: sesionActual.user.id, datos: datosAEnviar }, { onConflict: "user_id" });
+      if (error) return { ok: false, mensaje: "No se pudo guardar: " + error.message };
+      localStorage.setItem(CLOUD_UPLOAD_KEY, new Date().toISOString());
+      actualizarUICuenta();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, mensaje: "No se pudo conectar con el servidor. Revisá tu conexión a internet." };
+    }
   }
 
   async function guardarEnNube() {
-    if (!sb || !sesionActual) return;
-    const { data, error: errLectura } = await sb.from("datos_usuario")
-      .select("datos").eq("user_id", sesionActual.user.id).maybeSingle();
-    if (errLectura) { alert("No se pudo verificar los datos en la nube: " + errLectura.message); return; }
-    const datosAEnviar = (data && data.datos && Array.isArray(data.datos.suenos))
-      ? unirEstados(state, data.datos)
-      : state;
-    const { error } = await sb.from("datos_usuario")
-      .upsert({ user_id: sesionActual.user.id, datos: datosAEnviar }, { onConflict: "user_id" });
-    if (error) { alert("No se pudo guardar: " + error.message); return; }
-    localStorage.setItem(CLOUD_UPLOAD_KEY, new Date().toISOString());
-    actualizarUICuenta();
+    const resultado = await guardarDatosEnNube();
+    if (!resultado.ok) { alert(resultado.mensaje); return; }
     alert("Datos guardados en la nube.");
+  }
+
+  async function guardarEnNubeSilencioso() {
+    if (!sb || !sesionActual) return;
+    const resultado = await guardarDatosEnNube();
+    if (!resultado.ok) console.warn("Guardado automático en la nube falló:", resultado.mensaje);
   }
 
   async function descargarDeNube() {
     if (!sb || !sesionActual) return;
-    const { data, error } = await sb.from("datos_usuario")
-      .select("datos").eq("user_id", sesionActual.user.id).maybeSingle();
-    if (error) { alert("No se pudo descargar: " + error.message); return; }
-    if (!data || !data.datos || !Array.isArray(data.datos.suenos)) { alert("Todavía no guardaste datos desde ningún dispositivo."); return; }
-    const reemplazar = confirm("Aceptar = reemplazar tus datos locales con los de la nube.\nCancelar = fusionar (agregar solo lo que falte).");
-    fusionarEstadoImportado(data.datos, reemplazar);
-    localStorage.setItem(CLOUD_DOWNLOAD_KEY, new Date().toISOString());
-    renderBackup();
-    actualizarUICuenta();
-    alert("Datos descargados de la nube y aplicados.");
+    try {
+      const { data, error } = await sb.from("datos_usuario")
+        .select("datos").eq("user_id", sesionActual.user.id).maybeSingle();
+      if (error) { alert("No se pudo descargar: " + error.message); return; }
+      if (!data || !data.datos || !Array.isArray(data.datos.suenos)) { alert("Todavía no guardaste datos desde ningún dispositivo."); return; }
+      const reemplazar = confirm("Aceptar = reemplazar tus datos locales con los de la nube.\nCancelar = fusionar (agregar solo lo que falte).");
+      fusionarEstadoImportado(data.datos, reemplazar);
+      localStorage.setItem(CLOUD_DOWNLOAD_KEY, new Date().toISOString());
+      renderBackup();
+      actualizarUICuenta();
+      alert("Datos descargados de la nube y aplicados.");
+    } catch (e) {
+      alert("No se pudo conectar con el servidor. Revisá tu conexión a internet.");
+    }
   }
 
   document.getElementById("form-registro").addEventListener("submit", async (e) => {
