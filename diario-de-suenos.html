@@ -143,6 +143,12 @@
   .badge {
     display:inline-block; font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; color:#fff;
   }
+  .badge-estado {
+    display:inline-block; font-size: 0.72rem; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid; background: transparent;
+  }
+  .badge-estado.interpretado { color: var(--good); border-color: var(--good); }
+  .badge-estado.pendiente { color: var(--text-sec); border-color: var(--border); }
   .chips-inline { display:flex; flex-wrap:wrap; gap:5px; }
   .chip-static {
     font-size: 0.72rem; background: var(--page); border: 1px solid var(--border); color: var(--text-sec);
@@ -332,12 +338,14 @@
           <label class="field-label">Personas presentes</label>
           <div class="chips" id="chips-personas"></div>
           <input type="text" class="tag-input" id="input-personas" placeholder="Escribí un nombre y presioná Enter">
+          <div id="sugerencia-alias-personas" style="margin-top:6px;"></div>
         </div>
 
         <div class="field tag-field" data-field="lugares" id="campo-lugares-wrap">
           <label class="field-label">Lugares</label>
           <div class="chips" id="chips-lugares"></div>
           <input type="text" class="tag-input" id="input-lugares" placeholder="Escribí un lugar y presioná Enter">
+          <div id="sugerencia-alias-lugares" style="margin-top:6px;"></div>
         </div>
 
         <div class="field tag-field" data-field="simbolos">
@@ -345,6 +353,7 @@
           <div class="chips" id="chips-simbolos"></div>
           <input type="text" class="tag-input" id="input-simbolos" placeholder="Escribí un símbolo u objeto y presioná Enter">
           <p class="hint" id="hint-diccionario-simbolo" style="display:none; margin:6px 0 0;"></p>
+          <div id="sugerencia-alias-simbolos" style="margin-top:6px;"></div>
           <div id="sugerencias-simbolos-relato" style="margin-top:8px;"></div>
         </div>
 
@@ -687,7 +696,7 @@
   function escapeForFile(s) { return s; }
 
   // ---------- Estado ----------
-  let state = { suenos: [], interpretaciones: [], contextoPersonal: "" };
+  let state = { suenos: [], interpretaciones: [], contextoPersonal: "", aliasesTags: {} };
   let editingId = null;
   let formTags = { emociones: [], personas: [], lugares: [], simbolos: [] };
 
@@ -699,6 +708,7 @@
         state.suenos = Array.isArray(parsed.suenos) ? parsed.suenos : [];
         state.interpretaciones = Array.isArray(parsed.interpretaciones) ? parsed.interpretaciones : [];
         state.contextoPersonal = typeof parsed.contextoPersonal === "string" ? parsed.contextoPersonal : "";
+        state.aliasesTags = (parsed.aliasesTags && typeof parsed.aliasesTags === "object") ? parsed.aliasesTags : {};
       }
     } catch(e) { console.error("Error al cargar datos", e); }
   }
@@ -762,6 +772,10 @@
     if (formTags[field].some(t => t.toLowerCase() === v.toLowerCase())) return;
     formTags[field].push(v);
     renderChips(field);
+    if (["personas","lugares","simbolos"].includes(field)) {
+      const candidato = sugerirAliasCandidato(field, v);
+      if (candidato) mostrarSugerenciaAlias(field, v, candidato);
+    }
   }
   ["emociones","personas","lugares","simbolos"].forEach(field => {
     const input = document.getElementById("input-" + field);
@@ -944,6 +958,7 @@
     document.getElementById("btn-cancelar-edicion").style.display = "none";
     document.getElementById("hint-diccionario-simbolo").style.display = "none";
     document.getElementById("sugerencias-simbolos-relato").innerHTML = "";
+    ["personas","lugares","simbolos"].forEach(f => { document.getElementById("sugerencia-alias-" + f).innerHTML = ""; });
     dictadosRegistrados.forEach(estado => { if (estado.recognizing && estado.recognition) estado.recognition.stop(); });
   }
 
@@ -1028,7 +1043,10 @@
     badge.className = "badge";
     badge.style.background = TIPO_COLORVAR[s.tipo] || "var(--blue)";
     badge.textContent = TIPO_LABELS[s.tipo] || s.tipo;
-    topRow.append(fecha, badge);
+    const badgeEstado = document.createElement("span");
+    badgeEstado.className = "badge-estado " + (s.interpretado ? "interpretado" : "pendiente");
+    badgeEstado.textContent = s.interpretado ? "✓ Interpretado" : "Sin interpretar";
+    topRow.append(fecha, badge, badgeEstado);
 
     const h4 = document.createElement("h4");
     h4.textContent = s.titulo || "(sin título)";
@@ -1192,6 +1210,7 @@
     });
     document.getElementById("hint-diccionario-simbolo").style.display = "none";
     document.getElementById("sugerencias-simbolos-relato").innerHTML = "";
+    ["personas","lugares","simbolos"].forEach(f => { document.getElementById("sugerencia-alias-" + f).innerHTML = ""; });
     dictadosRegistrados.forEach(estado => { if (estado.recognizing && estado.recognition) estado.recognition.stop(); });
     activarTab("nuevo");
   }
@@ -1455,10 +1474,11 @@
   function topFrecuencia(suenos, campo, n) {
     const counts = new Map();
     suenos.forEach(s => {
-      (s[campo] || []).forEach(tag => {
-        const key = tag.trim().toLowerCase();
+      (s[campo] || []).forEach(tagRaw => {
+        const tag = resolverEtiqueta(tagRaw);
+        const key = normalizarTag(tag);
         if (!key) return;
-        const entry = counts.get(key) || { label: tag.trim(), value: 0 };
+        const entry = counts.get(key) || { label: tag, value: 0 };
         entry.value++;
         counts.set(key, entry);
       });
@@ -2108,14 +2128,78 @@
   function normalizarTag(t) { return t.trim().toLowerCase(); }
   const CAMPOS_TAG = ["emociones","personas","lugares","simbolos"];
 
+  // ---------- Alias de etiquetas (misma persona/lugar/símbolo, nombrado distinto) ----------
+  function resolverEtiqueta(tagOriginal) {
+    const key = normalizarTag(tagOriginal);
+    return state.aliasesTags[key] || tagOriginal.trim();
+  }
+  function variantesNormalizadas(tagLower) {
+    const canonico = state.aliasesTags[tagLower] || tagLower;
+    const canonicoNorm = normalizarTag(canonico);
+    const variantes = new Set([canonicoNorm, tagLower]);
+    Object.keys(state.aliasesTags).forEach(k => { if (normalizarTag(state.aliasesTags[k]) === canonicoNorm) variantes.add(k); });
+    return variantes;
+  }
+  function palabrasSignificativas(str) {
+    return (str || "")
+      .toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[.,;:!?¿¡"“”'()\[\]{}—-]/g, " ")
+      .split(/\s+/)
+      .filter(w => w.length >= 3 && !STOPWORDS_ES.has(w));
+  }
+  function sugerirAliasCandidato(field, nuevoTag) {
+    const nuevoNorm = normalizarTag(nuevoTag);
+    const nuevasPalabras = new Set(palabrasSignificativas(nuevoTag));
+    const existentes = new Set();
+    state.suenos.forEach(s => (s[field]||[]).forEach(t => existentes.add(t.trim())));
+    for (const existente of existentes) {
+      const existenteNorm = normalizarTag(existente);
+      if (existenteNorm === nuevoNorm) continue;
+      if (normalizarTag(resolverEtiqueta(existente)) === normalizarTag(resolverEtiqueta(nuevoTag))) continue;
+      const contieneUno = nuevoNorm.includes(existenteNorm) || existenteNorm.includes(nuevoNorm);
+      const comparten = nuevasPalabras.size && palabrasSignificativas(existente).some(w => nuevasPalabras.has(w));
+      if (contieneUno || comparten) return existente;
+    }
+    return null;
+  }
+  function vincularAlias(tagA, tagB) {
+    const a = tagA.trim(), b = tagB.trim();
+    const canonico = a.length >= b.length ? a : b;
+    const variante = canonico === a ? b : a;
+    state.aliasesTags[normalizarTag(variante)] = canonico;
+    state.aliasesTags[normalizarTag(canonico)] = canonico;
+    guardarEstado();
+  }
+  function mostrarSugerenciaAlias(field, nuevoTag, existente) {
+    const cont = document.getElementById("sugerencia-alias-" + field);
+    if (!cont) return;
+    cont.innerHTML = "";
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.style.margin = "0 0 4px";
+    p.textContent = `¿"${nuevoTag}" es lo mismo que "${existente}", que ya usaste antes?`;
+    const btnRow = document.createElement("div");
+    btnRow.className = "btn-row";
+    const btnSi = document.createElement("button");
+    btnSi.type = "button"; btnSi.className = "btn secondary small"; btnSi.textContent = "Sí, es lo mismo";
+    btnSi.addEventListener("click", () => { vincularAlias(nuevoTag, existente); cont.innerHTML = ""; renderMapa(); });
+    const btnNo = document.createElement("button");
+    btnNo.type = "button"; btnNo.className = "btn secondary small"; btnNo.textContent = "No, son distintos";
+    btnNo.addEventListener("click", () => { cont.innerHTML = ""; });
+    btnRow.append(btnSi, btnNo);
+    cont.append(p, btnRow);
+  }
+
   function getAllTagCounts() {
     const counts = new Map();
     state.suenos.forEach(s => {
       CAMPOS_TAG.forEach(campo => {
-        (s[campo] || []).forEach(tag => {
+        (s[campo] || []).forEach(tagRaw => {
+          const tag = resolverEtiqueta(tagRaw);
           const key = normalizarTag(tag);
           if (!key) return;
-          const entry = counts.get(key) || { label: tag.trim(), value: 0 };
+          const entry = counts.get(key) || { label: tag, value: 0 };
           entry.value++;
           counts.set(key, entry);
         });
@@ -2124,19 +2208,23 @@
     return counts;
   }
   function suenosConTag(tagLower) {
-    return state.suenos.filter(s => CAMPOS_TAG.some(campo => (s[campo]||[]).some(t => normalizarTag(t) === tagLower)));
+    const variantes = variantesNormalizadas(tagLower);
+    return state.suenos.filter(s => CAMPOS_TAG.some(campo => (s[campo]||[]).some(t => variantes.has(normalizarTag(t)))));
   }
   function coOcurrencias(tagLower, n) {
     const relacionados = suenosConTag(tagLower);
+    const variantes = variantesNormalizadas(tagLower);
     const counts = new Map();
     relacionados.forEach(s => {
       CAMPOS_TAG.forEach(campo => {
-        (s[campo]||[]).forEach(tag => {
-          const key = normalizarTag(tag);
-          if (!key || key === tagLower) return;
-          const entry = counts.get(key) || { label: tag.trim(), value: 0 };
+        (s[campo]||[]).forEach(tagRaw => {
+          const key = normalizarTag(tagRaw);
+          if (!key || variantes.has(key)) return;
+          const tag = resolverEtiqueta(tagRaw);
+          const keyResuelto = normalizarTag(tag);
+          const entry = counts.get(keyResuelto) || { label: tag, value: 0 };
           entry.value++;
-          counts.set(key, entry);
+          counts.set(keyResuelto, entry);
         });
       });
     });
@@ -2178,13 +2266,14 @@
   }
   function renderConexiones(tagInput) {
     const card = document.getElementById("card-resultado-conexion");
-    const tagLower = normalizarTag(tagInput || "");
+    const tagCanonico = resolverEtiqueta(tagInput || "");
+    const tagLower = normalizarTag(tagCanonico);
     if (!tagLower) { card.style.display = "none"; return; }
     const relacionados = suenosConTag(tagLower).sort((a,b) => (b.fecha||"").localeCompare(a.fecha||""));
     card.style.display = "block";
     document.getElementById("titulo-resultado-conexion").textContent = relacionados.length
-      ? `"${tagInput.trim()}" aparece en ${relacionados.length} sueño(s)`
-      : `No encontré sueños con "${tagInput.trim()}"`;
+      ? `"${tagCanonico}" aparece en ${relacionados.length} sueño(s)`
+      : `No encontré sueños con "${tagCanonico}"`;
 
     const coocCont = document.getElementById("cooc-resultado-conexion");
     coocCont.innerHTML = "";
