@@ -526,7 +526,9 @@
         <button class="btn" id="btn-generar-prompt">Generar prompt</button>
       </div>
 
-      <div class="field" id="bloque-prompt" style="margin-top:16px; display:none;">
+      <div id="resumen-seleccion-prompt" style="display:none; margin-top:16px; padding:10px 14px; border-radius:10px; background:var(--page); border:1px solid var(--border); font-weight:600;"></div>
+
+      <div class="field" id="bloque-prompt" style="margin-top:12px; display:none;">
         <label class="field-label">Prompt generado</label>
         <textarea id="prompt-generado" rows="10" readonly></textarea>
         <div class="btn-row">
@@ -1656,6 +1658,16 @@
     document.getElementById("prompt-generado").value = generarPrompt(seleccionActual);
     document.getElementById("bloque-prompt").style.display = "block";
     document.getElementById("bloque-respuesta").style.display = "block";
+
+    const titulos = seleccionActual.map(s => `${s.titulo || "(sin título)"} — ${s.fecha}`);
+    const MAX_MOSTRADOS = 3;
+    const texto = seleccionActual.length === 1
+      ? `📝 Interpretando: ${titulos[0]}`
+      : `📝 Interpretando ${seleccionActual.length} sueños: ${titulos.slice(0, MAX_MOSTRADOS).join(" · ")}` +
+        (titulos.length > MAX_MOSTRADOS ? ` · y ${titulos.length - MAX_MOSTRADOS} más` : "");
+    const resumen = document.getElementById("resumen-seleccion-prompt");
+    resumen.textContent = texto;
+    resumen.style.display = "block";
   }
   document.getElementById("btn-generar-prompt").addEventListener("click", generarYMostrarPrompt);
 
@@ -1699,6 +1711,7 @@
     document.getElementById("respuesta-ia").value = "";
     document.getElementById("bloque-prompt").style.display = "none";
     document.getElementById("bloque-respuesta").style.display = "none";
+    document.getElementById("resumen-seleccion-prompt").style.display = "none";
     actualizarPreviewSeleccion();
     renderHistorialInterpretaciones();
     alert("Interpretación guardada.");
