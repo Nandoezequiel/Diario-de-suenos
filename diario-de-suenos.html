@@ -1620,18 +1620,64 @@
       : "No hay sueños que coincidan con esta selección.";
   }
 
+  function generarContextoContinuidad(sel) {
+    const idsSeleccion = new Set(sel.map(s => s.id));
+    const etiquetasVistas = new Map();
+    sel.forEach(s => {
+      ["personas","lugares","simbolos"].forEach(campo => {
+        (s[campo]||[]).forEach(tagRaw => {
+          const label = resolverEtiqueta(tagRaw);
+          const key = campo + "::" + normalizarTag(label);
+          if (!etiquetasVistas.has(key)) etiquetasVistas.set(key, { campo, label, count: 0 });
+          etiquetasVistas.get(key).count++;
+        });
+      });
+    });
+
+    const bloques = [];
+    [...etiquetasVistas.values()].sort((a,b) => b.count - a.count).slice(0, 8).forEach(({campo, label}) => {
+      const variantes = variantesNormalizadas(normalizarTag(label));
+      const otros = state.suenos
+        .filter(s => !idsSeleccion.has(s.id) && (s[campo]||[]).some(t => variantes.has(normalizarTag(t))))
+        .sort((a,b) => b.fecha.localeCompare(a.fecha));
+      if (!otros.length) return;
+      let texto = `"${label}" (${campo}) también aparece en otros sueños ya registrados:\n`;
+      otros.slice(0, 3).forEach(o => {
+        texto += `- ${o.fecha} (${TIPO_LABELS[o.tipo]||o.tipo}) "${o.titulo||"(sin título)"}"`;
+        const interp = state.interpretaciones.find(it => (it.suenosIds||[]).includes(o.id) && it.respuesta);
+        if (interp) {
+          const resumen = interp.respuesta.replace(/\s+/g," ").trim().slice(0, 220);
+          texto += ` — interpretación previa de ese sueño: "${resumen}${interp.respuesta.length>220?"…":""}"`;
+        } else if ((o.emociones||[]).length) {
+          texto += ` — emociones registradas: ${o.emociones.join(", ")}`;
+        }
+        texto += "\n";
+      });
+      if (otros.length > 3) texto += `(y ${otros.length - 3} sueño(s) más con "${label}")\n`;
+      bloques.push(texto);
+    });
+    return bloques;
+  }
+
   function generarPrompt(sel) {
     let txt = "Actuá como un acompañante reflexivo para interpretar sueños (no como profesional clínico ni para diagnóstico médico o psicológico). ";
     txt += "Te paso un registro de sueños que anoté. Quiero que me ayudes a:\n";
     txt += "1. Identificar símbolos, personas, lugares o emociones que se repiten entre estos sueños.\n";
     txt += "2. Señalar posibles conexiones con mi vida despierta o mi estado emocional reciente.\n";
     txt += "3. Ofrecer una interpretación reflexiva y respetuosa, sin afirmaciones absolutas ni alarmistas.\n";
-    txt += "4. Sugerir 2 o 3 preguntas para que yo mismo siga explorando estos patrones.\n\n";
+    txt += "4. Sugerir 2 o 3 preguntas para que yo mismo siga explorando estos patrones.\n";
+    txt += "5. Si te doy contexto de continuidad de otros sueños donde aparecieron los mismos símbolos, personas o lugares, usalo: fijate si el significado se mantiene, cambia o se refuerza con el tiempo, en vez de interpretar cada aparición de forma aislada.\n\n";
     txt += "Aclaración: esto es para autoconocimiento personal, no reemplaza terapia ni diagnóstico psicológico.\n\n";
     if (state.contextoPersonal && state.contextoPersonal.trim()) {
       txt += `Contexto personal sobre mí (dato de fondo, no es parte de un sueño puntual): ${state.contextoPersonal.trim()}\n\n`;
     }
-    txt += "--- Sueños ---\n\n";
+    const continuidad = generarContextoContinuidad(sel);
+    if (continuidad.length) {
+      txt += "--- Contexto de continuidad (elementos que se repiten en otros sueños ya registrados) ---\n\n";
+      txt += continuidad.join("\n");
+      txt += "\n";
+    }
+    txt += "--- Sueños a interpretar ahora ---\n\n";
     sel.forEach(s => {
       txt += `Fecha: ${s.fecha} — ${s.titulo || "(sin título)"}\n`;
       txt += `Tipo: ${TIPO_LABELS[s.tipo] || s.tipo} | Claridad: ${s.claridad}/5 | Intensidad emocional: ${s.intensidad}/5\n`;
