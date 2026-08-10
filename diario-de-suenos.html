@@ -178,6 +178,9 @@
 
   svg.chart { width: 100%; height: auto; display:block; }
   .chart-wrap { margin-bottom: 8px; }
+  .chart-legend { display:flex; gap:16px; margin-bottom:8px; flex-wrap:wrap; }
+  .chart-legend .item { display:flex; align-items:center; gap:6px; font-size:0.82rem; color:var(--text-sec); }
+  .chart-legend .dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
 
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.45); display:flex;
@@ -405,6 +408,14 @@
     </div>
 
     <div class="card">
+      <h3>Claridad e intensidad a lo largo del tiempo</h3>
+      <p class="hint">Promedio mensual (escala 1-5). Sirve para ver si tu recuerdo de los sueños mejora con el tiempo.</p>
+      <div class="chart-legend" id="legend-claridad-intensidad"></div>
+      <div class="chart-wrap"><svg class="chart" id="chart-claridad-intensidad" height="220"></svg></div>
+      <p class="hint" id="hint-claridad-intensidad" style="display:none;">Todavía no hay suficientes datos.</p>
+    </div>
+
+    <div class="card">
       <h3>Tipos de sueño</h3>
       <div class="chart-wrap"><svg class="chart" id="chart-tipos"></svg></div>
     </div>
@@ -413,6 +424,12 @@
       <h3>Sueños por fase lunar</h3>
       <p class="hint">Agrupado por la fase de la luna en la fecha de cada sueño.</p>
       <div class="chart-wrap"><svg class="chart" id="chart-luna"></svg></div>
+    </div>
+
+    <div class="card">
+      <h3>Sueños por día de la semana</h3>
+      <p class="hint">¿Hay días en los que soñás (o registrás) más seguido?</p>
+      <div class="chart-wrap"><svg class="chart" id="chart-dia-semana"></svg></div>
     </div>
 
     <div class="card">
@@ -425,6 +442,18 @@
       <h3>Símbolos / objetos más frecuentes</h3>
       <div class="chart-wrap"><svg class="chart" id="chart-simbolos"></svg></div>
       <p class="hint" id="hint-simbolos" style="display:none;">Todavía no hay suficientes datos.</p>
+    </div>
+
+    <div class="card">
+      <h3>Personas más frecuentes</h3>
+      <div class="chart-wrap"><svg class="chart" id="chart-personas"></svg></div>
+      <p class="hint" id="hint-personas" style="display:none;">Todavía no hay suficientes datos.</p>
+    </div>
+
+    <div class="card">
+      <h3>Lugares más frecuentes</h3>
+      <div class="chart-wrap"><svg class="chart" id="chart-lugares"></svg></div>
+      <p class="hint" id="hint-lugares" style="display:none;">Todavía no hay suficientes datos.</p>
     </div>
   </section>
 
@@ -632,6 +661,7 @@
   const STORAGE_KEY = "diario_suenos_data_v1";
   const THEME_KEY = "diario_suenos_theme";
   const BACKUP_KEY = "diario_suenos_ultimo_backup";
+  const BANNER_DISMISS_KEY = "diario_suenos_banner_descartado";
 
   // ---------- Config de Supabase (opcional) ----------
   // Si estas dos constantes quedan con el valor "TODO...", la app funciona
@@ -1309,6 +1339,119 @@
     }
     return streak;
   }
+  function computeMejorRacha(suenos) {
+    const dates = [...new Set(suenos.map(s => s.fecha).filter(Boolean))].sort();
+    if (!dates.length) return 0;
+    let mejor = 1, actual = 1;
+    for (let i = 1; i < dates.length; i++) {
+      const prev = new Date(dates[i-1] + "T00:00:00");
+      const cur = new Date(dates[i] + "T00:00:00");
+      const diffDias = Math.round((cur - prev) / (1000*60*60*24));
+      actual = diffDias === 1 ? actual + 1 : 1;
+      mejor = Math.max(mejor, actual);
+    }
+    return mejor;
+  }
+  function computeDiaSemanaCounts(suenos) {
+    const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+    const counts = new Array(7).fill(0);
+    suenos.forEach(s => {
+      if (!s.fecha) return;
+      const d = new Date(s.fecha + "T00:00:00").getDay();
+      counts[d === 0 ? 6 : d - 1]++;
+    });
+    return DIAS.map((label, i) => ({ label, value: counts[i] }));
+  }
+  function computeMonthlyAveragesClaridadIntensidad(suenos, meses) {
+    const MES_LABEL = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+    const now = new Date();
+    const buckets = [];
+    for (let i = meses - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.push({ key: d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"), label: MES_LABEL[d.getMonth()], sumaClaridad: 0, sumaIntensidad: 0, n: 0 });
+    }
+    suenos.forEach(s => {
+      if (!s.fecha) return;
+      const key = s.fecha.slice(0,7);
+      const b = buckets.find(x => x.key === key);
+      if (!b) return;
+      b.sumaClaridad += Number(s.claridad)||0;
+      b.sumaIntensidad += Number(s.intensidad)||0;
+      b.n++;
+    });
+    return buckets.map(b => ({
+      label: b.label,
+      claridad: b.n ? b.sumaClaridad / b.n : null,
+      intensidad: b.n ? b.sumaIntensidad / b.n : null
+    }));
+  }
+
+  function renderDualLineChart(svgEl, points, seriesA, seriesB) {
+    svgEl.innerHTML = "";
+    const width = svgEl.clientWidth || 600, height = 220;
+    const padL = 26, padR = 16, padT = 20, padB = 26;
+    const innerW = width - padL - padR, innerH = height - padT - padB;
+    const niceMax = 5;
+    const stepX = innerW / Math.max(1, points.length - 1);
+    svgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+    [1, 3, 5].forEach(val => {
+      const gy = padT + innerH - (val/niceMax)*innerH;
+      const line = document.createElementNS(svgNS, "line");
+      line.setAttribute("x1", padL); line.setAttribute("x2", padL + innerW);
+      line.setAttribute("y1", gy); line.setAttribute("y2", gy);
+      line.setAttribute("stroke", "var(--grid)"); line.setAttribute("stroke-width", "1");
+      svgEl.appendChild(line);
+      svgEl.appendChild(svgText(padL - 6, gy + 4, String(val), "end", "var(--muted)", "11"));
+    });
+
+    [{ key: seriesA.key, colorVar: seriesA.colorVar }, { key: seriesB.key, colorVar: seriesB.colorVar }].forEach(serie => {
+      const xy = points.map((p, i) => ({ x: padL + i*stepX, y: padT + innerH - ((p[serie.key]||0)/niceMax)*innerH, v: p[serie.key], label: p.label }))
+        .filter(p => p.v !== null && p.v !== undefined);
+      if (xy.length < 2) return;
+      const lineD = xy.map((p,i) => (i===0?"M ":"L ") + p.x + " " + p.y).join(" ");
+      const linePath = document.createElementNS(svgNS, "path");
+      linePath.setAttribute("d", lineD); linePath.setAttribute("fill","none");
+      linePath.setAttribute("stroke", serie.colorVar); linePath.setAttribute("stroke-width","2");
+      linePath.setAttribute("stroke-linejoin","round"); linePath.setAttribute("stroke-linecap","round");
+      svgEl.appendChild(linePath);
+      xy.forEach(p => {
+        const g = document.createElementNS(svgNS, "g");
+        const ring = document.createElementNS(svgNS, "circle");
+        ring.setAttribute("cx", p.x); ring.setAttribute("cy", p.y); ring.setAttribute("r", "5"); ring.setAttribute("fill", "var(--surface)");
+        const dot = document.createElementNS(svgNS, "circle");
+        dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y); dot.setAttribute("r", "3.5"); dot.setAttribute("fill", serie.colorVar);
+        const title = document.createElementNS(svgNS, "title");
+        title.textContent = `${p.label}: ${p.v.toFixed(1)}`;
+        g.append(ring, dot, title);
+        svgEl.appendChild(g);
+      });
+    });
+
+    const showEvery = points.length > 8 ? 2 : 1;
+    points.forEach((p, i) => {
+      if (i % showEvery === 0 || i === points.length - 1) {
+        svgEl.appendChild(svgText(padL + i*stepX, height - 6, p.label, "middle", "var(--muted)", "10"));
+      }
+    });
+  }
+
+  function renderLeyendaChart(contId, items) {
+    const cont = document.getElementById(contId);
+    cont.innerHTML = "";
+    items.forEach(it => {
+      const div = document.createElement("div");
+      div.className = "item";
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.background = it.colorVar;
+      const label = document.createElement("span");
+      label.textContent = it.label;
+      div.append(dot, label);
+      cont.appendChild(div);
+    });
+  }
+
   function topFrecuencia(suenos, campo, n) {
     const counts = new Map();
     suenos.forEach(s => {
@@ -1331,6 +1474,7 @@
     const lucidos = suenos.filter(s => s.tipo === "lucido").length;
     const pctLucidos = total ? Math.round((lucidos/total)*100) : 0;
     const racha = computeStreak(suenos);
+    const mejorRacha = computeMejorRacha(suenos);
 
     const statGrid = document.getElementById("stat-grid");
     statGrid.innerHTML = "";
@@ -1338,6 +1482,7 @@
       ["Total registrados", total],
       ["Este mes", esteMes],
       ["Racha actual (días)", racha],
+      ["Mejor racha (días)", mejorRacha],
       ["% lúcidos", pctLucidos + "%"]
     ].forEach(([label, value]) => {
       const tile = document.createElement("div");
@@ -1348,6 +1493,17 @@
 
     renderHeatmap(document.getElementById("chart-heatmap"), computeCalendarDays(53));
     renderLineChart(document.getElementById("chart-timeline"), computeWeeklyCounts(suenos, 12));
+
+    const seriesClaridad = { key: "claridad", colorVar: "var(--blue)" };
+    const seriesIntensidad = { key: "intensidad", colorVar: "var(--orange)" };
+    const promediosMensuales = computeMonthlyAveragesClaridadIntensidad(suenos, 6);
+    const hayDatosClaridad = promediosMensuales.some(p => p.claridad !== null);
+    renderLeyendaChart("legend-claridad-intensidad", [
+      { label: "Claridad", colorVar: seriesClaridad.colorVar },
+      { label: "Intensidad emocional", colorVar: seriesIntensidad.colorVar }
+    ]);
+    renderDualLineChart(document.getElementById("chart-claridad-intensidad"), promediosMensuales, seriesClaridad, seriesIntensidad);
+    document.getElementById("hint-claridad-intensidad").style.display = hayDatosClaridad ? "none" : "block";
 
     const tiposItems = ["normal","lucido","pesadilla","recurrente","astral"].map(tipo => ({
       label: TIPO_LABELS[tipo],
@@ -1363,6 +1519,9 @@
     }));
     renderBarChart(document.getElementById("chart-luna"), lunaItems);
 
+    const diaSemanaItems = computeDiaSemanaCounts(suenos).map(it => ({ ...it, colorVar: "var(--yellow)" }));
+    renderBarChart(document.getElementById("chart-dia-semana"), diaSemanaItems);
+
     const emociones = topFrecuencia(suenos, "emociones", 8).map(it => ({
       ...it, colorVar: "var(--blue)", onClick: () => irAConexiones(it.label)
     }));
@@ -1374,6 +1533,18 @@
     }));
     renderBarChart(document.getElementById("chart-simbolos"), simbolos);
     document.getElementById("hint-simbolos").style.display = simbolos.length ? "none" : "block";
+
+    const personas = topFrecuencia(suenos, "personas", 8).map(it => ({
+      ...it, colorVar: "var(--orange)", onClick: () => irAConexiones(it.label)
+    }));
+    renderBarChart(document.getElementById("chart-personas"), personas);
+    document.getElementById("hint-personas").style.display = personas.length ? "none" : "block";
+
+    const lugares = topFrecuencia(suenos, "lugares", 8).map(it => ({
+      ...it, colorVar: "var(--green)", onClick: () => irAConexiones(it.label)
+    }));
+    renderBarChart(document.getElementById("chart-lugares"), lugares);
+    document.getElementById("hint-lugares").style.display = lugares.length ? "none" : "block";
   }
   window.addEventListener("resize", () => {
     if (document.getElementById("tab-mapa").classList.contains("active")) renderMapa();
@@ -2099,11 +2270,23 @@
     const fechas = state.suenos.map(s => s.fecha).filter(Boolean).sort();
     if (!fechas.length) return;
     const ultima = fechas[fechas.length - 1];
+    if (localStorage.getItem(BANNER_DISMISS_KEY) === ultima) return;
     const dias = Math.floor((new Date(todayStr()+"T00:00:00") - new Date(ultima+"T00:00:00")) / (1000*60*60*24));
     if (dias >= 3) {
       const div = document.createElement("div");
       div.className = "banner";
-      div.textContent = `Hace ${dias} día(s) que no anotás un sueño (el último fue el ${ultima}). Si tuviste alguno, cargalo antes de que se te olvide.`;
+      const p = document.createElement("p");
+      p.style.margin = "0 0 8px";
+      p.textContent = `Hace ${dias} día(s) que no anotás un sueño (el último fue el ${ultima}). Si tuviste alguno, cargalo antes de que se te olvide.`;
+      const btnDescartar = document.createElement("button");
+      btnDescartar.type = "button";
+      btnDescartar.className = "btn secondary small";
+      btnDescartar.textContent = "No tuve sueños, no avisar más por esto";
+      btnDescartar.addEventListener("click", () => {
+        localStorage.setItem(BANNER_DISMISS_KEY, ultima);
+        renderBannerConstancia();
+      });
+      div.append(p, btnDescartar);
       cont.appendChild(div);
     }
   }
