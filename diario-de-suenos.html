@@ -1143,12 +1143,53 @@
     addDT("Relato", s.texto);
     addDT("Notas al despertar", s.notas);
 
-    const sesiones = state.interpretaciones.filter(it => (it.suenosIds||[]).includes(s.id) && it.respuesta);
+    const sesiones = state.interpretaciones.filter(it => (it.suenosIds||[]).includes(s.id) && it.respuesta).sort((a,b) => a.fecha.localeCompare(b.fecha));
+    let seccionInterpretaciones = null;
     if (sesiones.length) {
-      const dt = document.createElement("dt"); dt.textContent = "Interpretaciones guardadas";
-      const dd = document.createElement("dd");
-      dd.textContent = sesiones.map(it => new Date(it.fecha).toLocaleDateString("es-AR")).join(", ");
-      dl.append(dt, dd);
+      seccionInterpretaciones = document.createElement("div");
+      seccionInterpretaciones.style.marginTop = "18px";
+      const h3interp = document.createElement("h3");
+      h3interp.style.margin = "0 0 8px";
+      h3interp.textContent = `Interpretaciones guardadas (${sesiones.length})`;
+      seccionInterpretaciones.appendChild(h3interp);
+
+      sesiones.forEach((it, i) => {
+        const det = document.createElement("details");
+        det.className = "session";
+        if (i === sesiones.length - 1) det.open = true;
+        const sum = document.createElement("summary");
+        sum.textContent = new Date(it.fecha).toLocaleDateString("es-AR");
+        const resp = document.createElement("div");
+        resp.className = "respuesta";
+        resp.textContent = it.respuesta;
+        const btnCopiar = document.createElement("button");
+        btnCopiar.type = "button"; btnCopiar.className = "btn secondary small";
+        btnCopiar.textContent = "Copiar esta interpretación";
+        btnCopiar.style.marginTop = "8px";
+        btnCopiar.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(it.respuesta);
+            const original = btnCopiar.textContent;
+            btnCopiar.textContent = "¡Copiado!";
+            setTimeout(() => { btnCopiar.textContent = original; }, 1500);
+          } catch (e) {
+            const ta = document.createElement("textarea");
+            ta.value = it.respuesta; ta.style.position = "fixed"; ta.style.opacity = "0";
+            document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+          }
+        });
+        det.append(sum, resp, btnCopiar);
+        seccionInterpretaciones.appendChild(det);
+      });
+
+      if (sesiones.length >= 2) {
+        const btnComparar = document.createElement("button");
+        btnComparar.type = "button"; btnComparar.className = "btn secondary";
+        btnComparar.style.marginTop = "6px";
+        btnComparar.textContent = "Comparar interpretaciones";
+        btnComparar.addEventListener("click", () => mostrarComparacionInterpretaciones(seccionInterpretaciones, s, sesiones));
+        seccionInterpretaciones.appendChild(btnComparar);
+      }
     }
 
     const btnRow = document.createElement("div");
@@ -1177,9 +1218,64 @@
     btnCerrar.addEventListener("click", cerrarModal);
     btnRow.append(btnEditar, btnInterpretar, btnEliminar, btnCerrar);
 
-    box.append(h2, dl, btnRow);
+    box.append(h2, dl);
+    if (seccionInterpretaciones) box.appendChild(seccionInterpretaciones);
+    box.appendChild(btnRow);
     overlay.style.display = "flex";
   }
+
+  function generarPromptComparacion(sueno, sesiones) {
+    let txt = "Ya interpreté este mismo sueño más de una vez. Quiero que compares esas interpretaciones entre sí, no que generes una nueva desde cero.\n\n";
+    txt += `Sueño: "${sueno.titulo || "(sin título)"}" (${sueno.fecha})\n`;
+    txt += `Relato: ${sueno.texto || "(sin relato)"}\n\n`;
+    sesiones.forEach((it, i) => {
+      txt += `--- Interpretación ${i+1} (guardada el ${new Date(it.fecha).toLocaleDateString("es-AR")}) ---\n${it.respuesta}\n\n`;
+    });
+    const continuidad = generarContextoContinuidad([sueno]);
+    if (continuidad.length) {
+      txt += "--- Contexto de continuidad de este sueño con otros sueños ya registrados ---\n\n";
+      txt += continuidad.join("\n");
+      txt += "\n";
+    }
+    txt += "Quiero que me digas: 1) qué se mantiene consistente entre esas interpretaciones, 2) qué cambió o se contradice entre ellas y a qué podría deberse (¿una leyó más detalle del relato? ¿mi contexto personal cambió? ¿es solo una diferencia de enfoque?), y 3) una lectura sintetizada que combine lo más valioso de ambas, teniendo en cuenta también el contexto de continuidad si te lo di arriba. Sin afirmaciones absolutas ni alarmistas, para autoconocimiento personal.";
+    return txt;
+  }
+
+  function mostrarComparacionInterpretaciones(contenedor, sueno, sesiones) {
+    const existente = contenedor.querySelector(".comparacion-interpretaciones");
+    if (existente) { existente.remove(); return; }
+
+    const bloque = document.createElement("div");
+    bloque.className = "comparacion-interpretaciones";
+    bloque.style.marginTop = "10px";
+
+    const promptTexto = generarPromptComparacion(sueno, sesiones);
+    const label = document.createElement("label");
+    label.className = "field-label";
+    label.textContent = "Prompt para comparar estas interpretaciones (copiá y pegá en tu IA)";
+    const ta = document.createElement("textarea");
+    ta.rows = 10; ta.readOnly = true; ta.value = promptTexto;
+    ta.style.marginBottom = "6px";
+
+    const btnCopiar = document.createElement("button");
+    btnCopiar.type = "button"; btnCopiar.className = "btn secondary small";
+    btnCopiar.textContent = "Copiar prompt de comparación";
+    btnCopiar.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(promptTexto);
+        const original = btnCopiar.textContent;
+        btnCopiar.textContent = "¡Copiado!";
+        setTimeout(() => { btnCopiar.textContent = original; }, 1500);
+      } catch (e) {
+        ta.select();
+        document.execCommand("copy");
+      }
+    });
+
+    bloque.append(label, ta, btnCopiar);
+    contenedor.appendChild(bloque);
+  }
+
   function cerrarModal() { document.getElementById("modal-overlay").style.display = "none"; }
   document.getElementById("modal-overlay").addEventListener("click", (e) => {
     if (e.target.id === "modal-overlay") cerrarModal();
