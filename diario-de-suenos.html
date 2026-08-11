@@ -1642,13 +1642,31 @@
       if (m) { idx = m.index; largoMatch = m[0].length; break; }
     }
     if (idx === -1) return null;
-    const RADIO = 150;
-    let inicio = Math.max(0, idx - RADIO);
-    let fin = Math.min(texto.length, idx + largoMatch + RADIO);
-    const puntoAntes = texto.lastIndexOf(". ", idx);
-    if (puntoAntes !== -1 && puntoAntes >= inicio) inicio = puntoAntes + 2;
-    const puntoDespues = texto.indexOf(". ", idx);
-    if (puntoDespues !== -1 && puntoDespues <= fin) fin = puntoDespues + 1;
+    const CAP = 220;
+
+    // Límites "fuertes": salto de párrafo o inicio de viñeta/lista (evita mezclar
+    // el final de una viñeta de markdown ajena con el inicio de la relevante).
+    const reLimite = /\n\s*\n|\n(?:[*\-•]|\d+[.)])\s+/g;
+    const limites = [0, texto.length];
+    let mLimite;
+    while ((mLimite = reLimite.exec(texto))) limites.push(mLimite.index + mLimite[0].length);
+
+    let inicio = Math.max(0, idx - CAP);
+    let limiteInicioAplicado = false;
+    limites.forEach(l => { if (l <= idx && l > inicio) { inicio = l; limiteInicioAplicado = true; } });
+    if (!limiteInicioAplicado) {
+      const puntoAntes = texto.lastIndexOf(". ", idx);
+      if (puntoAntes !== -1 && puntoAntes >= inicio) inicio = puntoAntes + 2;
+    }
+
+    let fin = Math.min(texto.length, idx + largoMatch + CAP);
+    let limiteFinAplicado = false;
+    limites.forEach(l => { if (l >= idx + largoMatch && l < fin) { fin = l; limiteFinAplicado = true; } });
+    if (!limiteFinAplicado) {
+      const puntoDespues = texto.indexOf(". ", idx);
+      if (puntoDespues !== -1 && puntoDespues <= fin) fin = puntoDespues + 1;
+    }
+
     const prefijo = inicio > 0 ? "…" : "";
     const sufijo = fin < texto.length ? "…" : "";
     let fragmento = texto.slice(inicio, fin).replace(/\s+/g, " ").trim();
