@@ -1229,7 +1229,8 @@
     txt += `Sueño: "${sueno.titulo || "(sin título)"}" (${sueno.fecha})\n`;
     txt += `Relato: ${sueno.texto || "(sin relato)"}\n\n`;
     sesiones.forEach((it, i) => {
-      txt += `--- Interpretación ${i+1} (guardada el ${new Date(it.fecha).toLocaleDateString("es-AR")}) ---\n${it.respuesta}\n\n`;
+      const tuvoContinuidad = typeof it.prompt === "string" && it.prompt.includes("Contexto de continuidad");
+      txt += `--- Interpretación ${i+1} (guardada el ${new Date(it.fecha).toLocaleDateString("es-AR")}; generada ${tuvoContinuidad ? "CON" : "SIN"} contexto de continuidad de otros sueños) ---\n${it.respuesta}\n\n`;
     });
     const continuidad = generarContextoContinuidad([sueno]);
     if (continuidad.length) {
@@ -1237,7 +1238,7 @@
       txt += continuidad.join("\n");
       txt += "\n";
     }
-    txt += "Quiero que me digas: 1) qué se mantiene consistente entre esas interpretaciones, 2) qué cambió o se contradice entre ellas y a qué podría deberse (¿una leyó más detalle del relato? ¿mi contexto personal cambió? ¿es solo una diferencia de enfoque?), y 3) una lectura sintetizada que combine lo más valioso de ambas, teniendo en cuenta también el contexto de continuidad si te lo di arriba. Sin afirmaciones absolutas ni alarmistas, para autoconocimiento personal.";
+    txt += "Quiero que me digas: 1) qué se mantiene consistente entre esas interpretaciones, 2) qué cambió o se contradice entre ellas y a qué podría deberse (fijate primero si una tenía contexto de continuidad y la otra no, ya que te lo indiqué arriba entre paréntesis — esa suele ser la causa principal; si ambas tenían el mismo estado de continuidad, entonces sí puede ser diferencia de enfoque o que una leyó más detalle del relato), y 3) una lectura sintetizada que combine lo más valioso de ambas, teniendo en cuenta también el contexto de continuidad si te lo di arriba. Sin afirmaciones absolutas ni alarmistas, para autoconocimiento personal.";
     return txt;
   }
 
