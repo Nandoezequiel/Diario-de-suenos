@@ -528,6 +528,8 @@
 
       <div id="resumen-seleccion-prompt" style="display:none; margin-top:16px; padding:10px 14px; border-radius:10px; background:var(--page); border:1px solid var(--border); font-weight:600;"></div>
 
+      <div id="panel-coincidencias" style="display:none; margin-top:16px;"></div>
+
       <div class="field" id="bloque-prompt" style="margin-top:12px; display:none;">
         <label class="field-label">Prompt generado</label>
         <textarea id="prompt-generado" rows="10" readonly></textarea>
@@ -687,6 +689,7 @@
 
   const TIPO_LABELS = { normal: "Normal", lucido: "Lúcido", pesadilla: "Pesadilla", recurrente: "Recurrente", astral: "Viaje astral" };
   const TIPO_COLORVAR = { normal: "var(--blue)", lucido: "var(--yellow)", pesadilla: "var(--red)", recurrente: "var(--violet)", astral: "var(--magenta)" };
+  const CAMPO_LABEL = { personas: "persona", lugares: "lugar", simbolos: "símbolo" };
 
   function uid() {
     try { return crypto.randomUUID(); } catch(e) { return "id-" + Date.now() + "-" + Math.random().toString(36).slice(2); }
@@ -698,7 +701,7 @@
   function escapeForFile(s) { return s; }
 
   // ---------- Estado ----------
-  let state = { suenos: [], interpretaciones: [], contextoPersonal: "", aliasesTags: {} };
+  let state = { suenos: [], interpretaciones: [], contextoPersonal: "", aliasesTags: {}, significadosEntidad: {} };
   let editingId = null;
   let formTags = { emociones: [], personas: [], lugares: [], simbolos: [] };
 
@@ -711,6 +714,7 @@
         state.interpretaciones = Array.isArray(parsed.interpretaciones) ? parsed.interpretaciones : [];
         state.contextoPersonal = typeof parsed.contextoPersonal === "string" ? parsed.contextoPersonal : "";
         state.aliasesTags = (parsed.aliasesTags && typeof parsed.aliasesTags === "object") ? parsed.aliasesTags : {};
+        state.significadosEntidad = (parsed.significadosEntidad && typeof parsed.significadosEntidad === "object") ? parsed.significadosEntidad : {};
       }
     } catch(e) { console.error("Error al cargar datos", e); }
   }
@@ -1663,7 +1667,7 @@
     return false;
   }
 
-  function generarContextoContinuidad(sel) {
+  function obtenerCoincidencias(sel) {
     const idsSeleccion = new Set(sel.map(s => s.id));
     const etiquetasVistas = new Map();
     sel.forEach(s => {
@@ -1677,29 +1681,65 @@
       });
     });
 
-    const bloques = [];
+    const resultado = [];
     [...etiquetasVistas.values()].sort((a,b) => b.count - a.count).slice(0, 8).forEach(({campo, label}) => {
-      const otros = state.suenos
+      const todos = state.suenos
         .filter(s => !idsSeleccion.has(s.id) && (s[campo]||[]).some(t => tagsRelacionados(t, label)))
         .sort((a,b) => b.fecha.localeCompare(a.fecha));
-      if (!otros.length) return;
+      if (todos.length) resultado.push({ campo, label, otros: todos.slice(0, 3), totalOtros: todos.length });
+    });
+    return resultado;
+  }
+
+  function claveSignificado(campo, label, suenoId) {
+    return campo + "::" + normalizarTag(resolverEtiqueta(label)) + "::" + suenoId;
+  }
+  function obtenerSignificado(campo, label, suenoId) {
+    return state.significadosEntidad[claveSignificado(campo, label, suenoId)] || null;
+  }
+  function guardarSignificadoEntidad(campo, label, suenoId, texto) {
+    state.significadosEntidad[claveSignificado(campo, label, suenoId)] = { texto: texto.trim(), guardadoEn: new Date().toISOString() };
+    guardarEstado();
+    guardarEnNubeSilencioso();
+  }
+
+  function generarPromptSignificado(campo, label, suenoViejo) {
+    const interp = state.interpretaciones.find(it => (it.suenosIds||[]).includes(suenoViejo.id) && it.respuesta);
+    let txt = "Te paso un sueño que ya había registrado antes (es contexto de un sueño anterior, no el que quiero interpretar ahora), para que me ayudes a puntualizar un solo aspecto de él.\n\n";
+    txt += `Fecha: ${suenoViejo.fecha} — "${suenoViejo.titulo || "(sin título)"}"\n`;
+    txt += `Relato: ${suenoViejo.texto || "(sin relato)"}\n\n`;
+    if (interp) {
+      txt += `Ya tengo esta interpretación completa guardada de ese sueño:\n${interp.respuesta}\n\n`;
+    }
+    txt += `Quiero que me respondas, en 2 a 4 oraciones y sin repetir el análisis completo del sueño, qué significó específicamente "${label}" (${CAMPO_LABEL[campo]||campo}) en ESE sueño puntual. Respondé directo, sin saludos ni introducciones.`;
+    return txt;
+  }
+
+  function generarContextoContinuidad(sel) {
+    const bloques = [];
+    obtenerCoincidencias(sel).forEach(({campo, label, otros, totalOtros}) => {
       let texto = `"${label}" (${campo}) también aparece en otros sueños ya registrados:\n`;
-      otros.slice(0, 3).forEach(o => {
+      otros.forEach(o => {
         texto += `- ${o.fecha} (${TIPO_LABELS[o.tipo]||o.tipo}) "${o.titulo||"(sin título)"}"`;
-        const interp = state.interpretaciones.find(it => (it.suenosIds||[]).includes(o.id) && it.respuesta);
-        if (interp) {
-          const fragmento = extraerFragmentoRelevante(interp.respuesta, label);
-          if (fragmento) {
-            texto += ` — lo que decía la interpretación previa sobre esto: "${fragmento}"`;
+        const significado = obtenerSignificado(campo, label, o.id);
+        if (significado) {
+          texto += ` — significado que ya definiste para esto en ese sueño: "${significado.texto}"`;
+        } else {
+          const interp = state.interpretaciones.find(it => (it.suenosIds||[]).includes(o.id) && it.respuesta);
+          if (interp) {
+            const fragmento = extraerFragmentoRelevante(interp.respuesta, label);
+            if (fragmento) {
+              texto += ` — fragmento de la interpretación previa sobre esto: "${fragmento}"`;
+            } else if ((o.emociones||[]).length) {
+              texto += ` — la interpretación previa no lo menciona textualmente; emociones registradas en ese sueño: ${o.emociones.join(", ")}`;
+            }
           } else if ((o.emociones||[]).length) {
-            texto += ` — la interpretación previa no lo menciona textualmente; emociones registradas en ese sueño: ${o.emociones.join(", ")}`;
+            texto += ` — emociones registradas: ${o.emociones.join(", ")}`;
           }
-        } else if ((o.emociones||[]).length) {
-          texto += ` — emociones registradas: ${o.emociones.join(", ")}`;
         }
         texto += "\n";
       });
-      if (otros.length > 3) texto += `(y ${otros.length - 3} sueño(s) más con "${label}")\n`;
+      if (totalOtros > otros.length) texto += `(y ${totalOtros - otros.length} sueño(s) más con "${label}")\n`;
       bloques.push(texto);
     });
     return bloques;
@@ -1743,6 +1783,126 @@
     return txt;
   }
 
+  function mostrarEditorSignificado(fila, campo, label, suenoViejo) {
+    const existente = fila.querySelector(".editor-significado");
+    if (existente) { existente.remove(); return; }
+
+    const editor = document.createElement("div");
+    editor.className = "editor-significado";
+    editor.style.marginTop = "8px";
+
+    const promptTexto = generarPromptSignificado(campo, label, suenoViejo);
+    const labelPrompt = document.createElement("label");
+    labelPrompt.className = "field-label";
+    labelPrompt.textContent = "Prompt para pedirle a tu IA el significado (copiá y pegá)";
+    const taPrompt = document.createElement("textarea");
+    taPrompt.rows = 6; taPrompt.readOnly = true; taPrompt.value = promptTexto;
+    taPrompt.style.marginBottom = "6px";
+
+    const btnCopiar = document.createElement("button");
+    btnCopiar.type = "button"; btnCopiar.className = "btn secondary small";
+    btnCopiar.textContent = "Copiar prompt";
+    btnCopiar.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(promptTexto);
+        const original = btnCopiar.textContent;
+        btnCopiar.textContent = "¡Copiado!";
+        setTimeout(() => { btnCopiar.textContent = original; }, 1500);
+      } catch (e) {
+        taPrompt.select();
+        document.execCommand("copy");
+      }
+    });
+
+    const labelResp = document.createElement("label");
+    labelResp.className = "field-label";
+    labelResp.style.marginTop = "10px";
+    labelResp.textContent = "Pegá acá lo que te respondió la IA";
+    const taResp = document.createElement("textarea");
+    taResp.rows = 4;
+    const significadoActual = obtenerSignificado(campo, label, suenoViejo.id);
+    if (significadoActual) taResp.value = significadoActual.texto;
+
+    const btnGuardar = document.createElement("button");
+    btnGuardar.type = "button"; btnGuardar.className = "btn small";
+    btnGuardar.style.marginTop = "6px";
+    btnGuardar.textContent = "Guardar significado";
+    btnGuardar.addEventListener("click", () => {
+      const texto = taResp.value.trim();
+      if (!texto) { alert("Pegá el significado antes de guardar."); return; }
+      guardarSignificadoEntidad(campo, label, suenoViejo.id, texto);
+      renderCoincidencias(seleccionActual);
+      actualizarPromptGenerado();
+    });
+
+    editor.append(labelPrompt, taPrompt, btnCopiar, labelResp, taResp, btnGuardar);
+    fila.appendChild(editor);
+  }
+
+  function renderCoincidencias(sel) {
+    const cont = document.getElementById("panel-coincidencias");
+    const coincidencias = obtenerCoincidencias(sel);
+    cont.innerHTML = "";
+    if (!coincidencias.length) { cont.style.display = "none"; return; }
+    cont.style.display = "block";
+
+    const card = document.createElement("div");
+    card.className = "card";
+    const h3 = document.createElement("h3");
+    h3.textContent = "Coincidencias con sueños anteriores";
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = "Estos elementos ya aparecieron en otros sueños. Si querés, pedile a tu IA qué significaron puntualmente ahí y pegá la respuesta — el prompt final va a usar ese significado curado en vez de intentar adivinarlo de la interpretación completa.";
+    card.append(h3, hint);
+
+    coincidencias.forEach(({campo, label, otros, totalOtros}) => {
+      const bloqueEntidad = document.createElement("div");
+      bloqueEntidad.style.cssText = "margin-top:14px; padding-top:14px; border-top:1px solid var(--border);";
+      const titulo = document.createElement("p");
+      titulo.style.cssText = "font-weight:600; margin:0 0 8px;";
+      titulo.textContent = `"${label}" (${CAMPO_LABEL[campo]||campo})`;
+      bloqueEntidad.appendChild(titulo);
+
+      otros.forEach(o => {
+        const fila = document.createElement("div");
+        fila.style.cssText = "margin-bottom:10px; padding:10px; border-radius:8px; background:var(--page);";
+        const encabezado = document.createElement("p");
+        encabezado.style.cssText = "margin:0 0 6px; font-size:0.85rem; color:var(--text-sec);";
+        encabezado.textContent = `${o.fecha} — "${o.titulo || "(sin título)"}"`;
+        fila.appendChild(encabezado);
+
+        const significado = obtenerSignificado(campo, label, o.id);
+        if (significado) {
+          const p = document.createElement("p");
+          p.style.margin = "0 0 6px";
+          p.textContent = `✅ ${significado.texto}`;
+          fila.appendChild(p);
+        }
+        const btn = document.createElement("button");
+        btn.type = "button"; btn.className = "btn secondary small";
+        btn.textContent = significado ? "Editar significado" : "Pedirle a la IA qué significó esto ahí";
+        btn.addEventListener("click", () => mostrarEditorSignificado(fila, campo, label, o));
+        fila.appendChild(btn);
+
+        bloqueEntidad.appendChild(fila);
+      });
+      if (totalOtros > otros.length) {
+        const masP = document.createElement("p");
+        masP.className = "hint";
+        masP.textContent = `(y ${totalOtros - otros.length} sueño(s) más con "${label}")`;
+        bloqueEntidad.appendChild(masP);
+      }
+      card.appendChild(bloqueEntidad);
+    });
+
+    cont.appendChild(card);
+  }
+
+  function actualizarPromptGenerado() {
+    if (!seleccionActual.length) return;
+    document.getElementById("prompt-generado").value = generarPrompt(seleccionActual);
+  }
+
   let seleccionActual = [];
   function generarYMostrarPrompt() {
     seleccionActual = suenosSeleccionados();
@@ -1750,6 +1910,7 @@
     document.getElementById("prompt-generado").value = generarPrompt(seleccionActual);
     document.getElementById("bloque-prompt").style.display = "block";
     document.getElementById("bloque-respuesta").style.display = "block";
+    renderCoincidencias(seleccionActual);
 
     const titulos = seleccionActual.map(s => `${s.titulo || "(sin título)"} — ${s.fecha}`);
     const MAX_MOSTRADOS = 3;
@@ -1804,6 +1965,7 @@
     document.getElementById("bloque-prompt").style.display = "none";
     document.getElementById("bloque-respuesta").style.display = "none";
     document.getElementById("resumen-seleccion-prompt").style.display = "none";
+    document.getElementById("panel-coincidencias").style.display = "none";
     actualizarPreviewSeleccion();
     renderHistorialInterpretaciones();
     alert("Interpretación guardada.");
@@ -1906,12 +2068,16 @@
       state.suenos = Array.isArray(parsed.suenos) ? parsed.suenos : [];
       state.interpretaciones = Array.isArray(parsed.interpretaciones) ? parsed.interpretaciones : [];
       if (typeof parsed.contextoPersonal === "string") state.contextoPersonal = parsed.contextoPersonal;
+      state.aliasesTags = (parsed.aliasesTags && typeof parsed.aliasesTags === "object") ? parsed.aliasesTags : {};
+      state.significadosEntidad = (parsed.significadosEntidad && typeof parsed.significadosEntidad === "object") ? parsed.significadosEntidad : {};
     } else {
       const idsExistentes = new Set(state.suenos.map(s => s.id));
       (parsed.suenos||[]).forEach(s => { if (!idsExistentes.has(s.id)) state.suenos.push(s); });
       const idsInterp = new Set(state.interpretaciones.map(i => i.id));
       (parsed.interpretaciones||[]).forEach(i => { if (!idsInterp.has(i.id)) state.interpretaciones.push(i); });
       if (!state.contextoPersonal && typeof parsed.contextoPersonal === "string") state.contextoPersonal = parsed.contextoPersonal;
+      state.aliasesTags = unirDiccionarios(state.aliasesTags, parsed.aliasesTags);
+      state.significadosEntidad = unirDiccionarios(state.significadosEntidad, parsed.significadosEntidad);
     }
     document.getElementById("campo-contexto-personal").value = state.contextoPersonal || "";
     guardarEstado();
@@ -1939,6 +2105,10 @@
   });
 
   // ---------- Cuenta / Supabase (nube, opcional) ----------
+  function unirDiccionarios(local, nube) {
+    return { ...(nube && typeof nube === "object" ? nube : {}), ...(local && typeof local === "object" ? local : {}) };
+  }
+
   function unirEstados(local, nube) {
     const suenos = Array.isArray(local.suenos) ? [...local.suenos] : [];
     const idsExistentes = new Set(suenos.map(s => s.id));
@@ -1949,7 +2119,9 @@
     const contextoPersonal = (local.contextoPersonal && local.contextoPersonal.trim())
       ? local.contextoPersonal
       : (typeof nube.contextoPersonal === "string" ? nube.contextoPersonal : "");
-    return { suenos, interpretaciones, contextoPersonal };
+    const aliasesTags = unirDiccionarios(local.aliasesTags, nube.aliasesTags);
+    const significadosEntidad = unirDiccionarios(local.significadosEntidad, nube.significadosEntidad);
+    return { suenos, interpretaciones, contextoPersonal, aliasesTags, significadosEntidad };
   }
 
   function traducirErrorAuth(error) {
