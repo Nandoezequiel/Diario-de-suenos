@@ -1620,6 +1620,49 @@
       : "No hay sueños que coincidan con esta selección.";
   }
 
+  function extraerFragmentoRelevante(texto, label) {
+    if (!texto) return null;
+    const stripAcentos = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const textoNorm = stripAcentos(texto).toLowerCase();
+    const palabrasCrudas = stripAcentos(label || "")
+      .replace(/[.,;:!?¿¡"“”'()\[\]{}—-]/g, " ")
+      .split(/\s+/)
+      .filter(w => w.length >= 3 && !STOPWORDS_ES.has(w.toLowerCase()));
+    const propias = palabrasCrudas.filter(w => /^[A-ZÑ]/.test(w));
+    const comunes = palabrasCrudas.filter(w => !/^[A-ZÑ]/.test(w));
+    const candidatos = [...new Set([...propias, ...comunes].map(w => w.toLowerCase()))];
+    let idx = -1, largoMatch = 0;
+    for (const palabra of candidatos) {
+      const re = new RegExp("\\b" + palabra.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\w*", "i");
+      const m = textoNorm.match(re);
+      if (m) { idx = m.index; largoMatch = m[0].length; break; }
+    }
+    if (idx === -1) return null;
+    const RADIO = 150;
+    let inicio = Math.max(0, idx - RADIO);
+    let fin = Math.min(texto.length, idx + largoMatch + RADIO);
+    const puntoAntes = texto.lastIndexOf(". ", idx);
+    if (puntoAntes !== -1 && puntoAntes >= inicio) inicio = puntoAntes + 2;
+    const puntoDespues = texto.indexOf(". ", idx);
+    if (puntoDespues !== -1 && puntoDespues <= fin) fin = puntoDespues + 1;
+    const prefijo = inicio > 0 ? "…" : "";
+    const sufijo = fin < texto.length ? "…" : "";
+    let fragmento = texto.slice(inicio, fin).replace(/\s+/g, " ").trim();
+    if (sufijo) {
+      const ultimoEspacio = fragmento.lastIndexOf(" ");
+      if (ultimoEspacio > fragmento.length * 0.6) fragmento = fragmento.slice(0, ultimoEspacio);
+    }
+    return prefijo + fragmento + sufijo;
+  }
+
+  function tagsRelacionados(tagA, tagB) {
+    const a = normalizarTag(resolverEtiqueta(tagA));
+    const b = normalizarTag(resolverEtiqueta(tagB));
+    if (a === b) return true;
+    if (a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a))) return true;
+    return false;
+  }
+
   function generarContextoContinuidad(sel) {
     const idsSeleccion = new Set(sel.map(s => s.id));
     const etiquetasVistas = new Map();
@@ -1636,9 +1679,8 @@
 
     const bloques = [];
     [...etiquetasVistas.values()].sort((a,b) => b.count - a.count).slice(0, 8).forEach(({campo, label}) => {
-      const variantes = variantesNormalizadas(normalizarTag(label));
       const otros = state.suenos
-        .filter(s => !idsSeleccion.has(s.id) && (s[campo]||[]).some(t => variantes.has(normalizarTag(t))))
+        .filter(s => !idsSeleccion.has(s.id) && (s[campo]||[]).some(t => tagsRelacionados(t, label)))
         .sort((a,b) => b.fecha.localeCompare(a.fecha));
       if (!otros.length) return;
       let texto = `"${label}" (${campo}) también aparece en otros sueños ya registrados:\n`;
@@ -1646,8 +1688,12 @@
         texto += `- ${o.fecha} (${TIPO_LABELS[o.tipo]||o.tipo}) "${o.titulo||"(sin título)"}"`;
         const interp = state.interpretaciones.find(it => (it.suenosIds||[]).includes(o.id) && it.respuesta);
         if (interp) {
-          const resumen = interp.respuesta.replace(/\s+/g," ").trim().slice(0, 220);
-          texto += ` — interpretación previa de ese sueño: "${resumen}${interp.respuesta.length>220?"…":""}"`;
+          const fragmento = extraerFragmentoRelevante(interp.respuesta, label);
+          if (fragmento) {
+            texto += ` — lo que decía la interpretación previa sobre esto: "${fragmento}"`;
+          } else if ((o.emociones||[]).length) {
+            texto += ` — la interpretación previa no lo menciona textualmente; emociones registradas en ese sueño: ${o.emociones.join(", ")}`;
+          }
         } else if ((o.emociones||[]).length) {
           texto += ` — emociones registradas: ${o.emociones.join(", ")}`;
         }
