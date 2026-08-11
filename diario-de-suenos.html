@@ -1624,59 +1624,6 @@
       : "No hay sueños que coincidan con esta selección.";
   }
 
-  function extraerFragmentoRelevante(texto, label) {
-    if (!texto) return null;
-    const stripAcentos = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
-    const textoNorm = stripAcentos(texto).toLowerCase();
-    const palabrasCrudas = stripAcentos(label || "")
-      .replace(/[.,;:!?¿¡"“”'()\[\]{}—-]/g, " ")
-      .split(/\s+/)
-      .filter(w => w.length >= 3 && !STOPWORDS_ES.has(w.toLowerCase()));
-    const propias = palabrasCrudas.filter(w => /^[A-ZÑ]/.test(w));
-    const comunes = palabrasCrudas.filter(w => !/^[A-ZÑ]/.test(w));
-    const candidatos = [...new Set([...propias, ...comunes].map(w => w.toLowerCase()))];
-    let idx = -1, largoMatch = 0;
-    for (const palabra of candidatos) {
-      const re = new RegExp("\\b" + palabra.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\w*", "i");
-      const m = textoNorm.match(re);
-      if (m) { idx = m.index; largoMatch = m[0].length; break; }
-    }
-    if (idx === -1) return null;
-    const CAP = 220;
-
-    // Límites "fuertes": salto de párrafo o inicio de viñeta/lista (evita mezclar
-    // el final de una viñeta de markdown ajena con el inicio de la relevante).
-    const reLimite = /\n\s*\n|\n(?:[*\-•]|\d+[.)])\s+/g;
-    const limites = [0, texto.length];
-    let mLimite;
-    while ((mLimite = reLimite.exec(texto))) limites.push(mLimite.index + mLimite[0].length);
-
-    let inicio = Math.max(0, idx - CAP);
-    let limiteInicioAplicado = false;
-    limites.forEach(l => { if (l <= idx && l > inicio) { inicio = l; limiteInicioAplicado = true; } });
-    if (!limiteInicioAplicado) {
-      const puntoAntes = texto.lastIndexOf(". ", idx);
-      if (puntoAntes !== -1 && puntoAntes >= inicio) inicio = puntoAntes + 2;
-    }
-
-    let fin = Math.min(texto.length, idx + largoMatch + CAP);
-    let limiteFinAplicado = false;
-    limites.forEach(l => { if (l >= idx + largoMatch && l < fin) { fin = l; limiteFinAplicado = true; } });
-    if (!limiteFinAplicado) {
-      const puntoDespues = texto.indexOf(". ", idx);
-      if (puntoDespues !== -1 && puntoDespues <= fin) fin = puntoDespues + 1;
-    }
-
-    const prefijo = inicio > 0 ? "…" : "";
-    const sufijo = fin < texto.length ? "…" : "";
-    let fragmento = texto.slice(inicio, fin).replace(/\s+/g, " ").trim();
-    if (sufijo) {
-      const ultimoEspacio = fragmento.lastIndexOf(" ");
-      if (ultimoEspacio > fragmento.length * 0.6) fragmento = fragmento.slice(0, ultimoEspacio);
-    }
-    return prefijo + fragmento + sufijo;
-  }
-
   function tagsRelacionados(tagA, tagB) {
     const a = normalizarTag(resolverEtiqueta(tagA));
     const b = normalizarTag(resolverEtiqueta(tagB));
@@ -1742,18 +1689,10 @@
         const significado = obtenerSignificado(campo, label, o.id);
         if (significado) {
           texto += ` — significado que ya definiste para esto en ese sueño: "${significado.texto}"`;
+        } else if ((o.emociones||[]).length) {
+          texto += ` — todavía no definiste qué significó esto puntualmente en ese sueño (no asumas nada al respecto); emociones registradas en ese sueño: ${o.emociones.join(", ")}`;
         } else {
-          const interp = state.interpretaciones.find(it => (it.suenosIds||[]).includes(o.id) && it.respuesta);
-          if (interp) {
-            const fragmento = extraerFragmentoRelevante(interp.respuesta, label);
-            if (fragmento) {
-              texto += ` — fragmento de la interpretación previa sobre esto: "${fragmento}"`;
-            } else if ((o.emociones||[]).length) {
-              texto += ` — la interpretación previa no lo menciona textualmente; emociones registradas en ese sueño: ${o.emociones.join(", ")}`;
-            }
-          } else if ((o.emociones||[]).length) {
-            texto += ` — emociones registradas: ${o.emociones.join(", ")}`;
-          }
+          texto += ` — todavía no definiste qué significó esto puntualmente en ese sueño (no asumas nada al respecto)`;
         }
         texto += "\n";
       });
