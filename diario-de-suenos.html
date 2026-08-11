@@ -532,6 +532,7 @@
 
       <div class="field" id="bloque-prompt" style="margin-top:12px; display:none;">
         <label class="field-label">Prompt generado</label>
+        <p class="hint" id="hint-prompt-generado" style="display:none; margin:-4px 0 8px;">Pegá esto como el último mensaje del mismo chat donde ya hablaste de las coincidencias de arriba (Paso 1, 2, 3...), no en un chat nuevo.</p>
         <textarea id="prompt-generado" rows="10" readonly></textarea>
         <div class="btn-row">
           <button class="btn secondary" id="btn-copiar-prompt">Copiar al portapapeles</button>
@@ -1717,6 +1718,7 @@
     const continuidad = generarContextoContinuidad(sel);
     if (continuidad.length) {
       txt += "--- Contexto de continuidad (elementos que se repiten en otros sueños ya registrados) ---\n\n";
+      txt += "Nota: si en ESTA MISMA conversación ya te pregunté antes por el significado de alguno de estos elementos repetidos (te pasé el relato de un sueño anterior y te pedí que me dijeras qué significaba puntualmente ahí), ya tenés esa respuesta tuya en el historial de este chat — priorizala como el contexto más confiable. Para lo que no te haya preguntado todavía en esta conversación, usá lo que te doy a continuación, y si dice que el significado no está definido, no lo inventes.\n\n";
       txt += continuidad.join("\n");
       txt += "\n";
     }
@@ -1807,11 +1809,35 @@
     card.className = "card";
     const h3 = document.createElement("h3");
     h3.textContent = "Coincidencias con sueños anteriores";
+    card.appendChild(h3);
+
+    const instrucciones = document.createElement("div");
+    instrucciones.style.cssText = "background:var(--page); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:8px 0 4px;";
+    const pInstr = document.createElement("p");
+    pInstr.style.cssText = "margin:0 0 6px; font-weight:600;";
+    pInstr.textContent = "Cómo sacarle el jugo a esto:";
+    const ol = document.createElement("ol");
+    ol.style.cssText = "margin:0; padding-left:20px; font-size:0.9rem; color:var(--text-sec);";
+    [
+      "Abrí un chat nuevo con tu IA y usá ESE MISMO chat para todos los pasos siguientes (no abras uno nuevo para cada uno).",
+      "Copiá el prompt del Paso 1 de abajo, pegalo en ese chat y, cuando te responda, pegá esa respuesta acá para guardarla.",
+      "Repetí lo mismo con el Paso 2, el Paso 3, etc. — todo en el mismo chat, uno después del otro.",
+      "Por último, copiá el \"Prompt generado\" de más abajo y pegalo como el último mensaje de ese mismo chat. Como la IA todavía tiene fresco en la conversación lo que hablaron sobre cada coincidencia, la interpretación del sueño nuevo va a tener contexto real en vez de uno adivinado."
+    ].forEach(texto => {
+      const li = document.createElement("li");
+      li.textContent = texto;
+      li.style.marginBottom = "4px";
+      ol.appendChild(li);
+    });
+    instrucciones.append(pInstr, ol);
+    card.appendChild(instrucciones);
+
     const hint = document.createElement("p");
     hint.className = "hint";
-    hint.textContent = "Estos elementos ya aparecieron en otros sueños. Si querés, pedile a tu IA qué significaron puntualmente ahí y pegá la respuesta — el prompt final va a usar ese significado curado en vez de intentar adivinarlo de la interpretación completa.";
-    card.append(h3, hint);
+    hint.textContent = "Pegar la respuesta acá (además de en el chat) es lo que la guarda para la próxima vez que aparezca este mismo elemento, incluso en un chat distinto.";
+    card.appendChild(hint);
 
+    let paso = 0;
     coincidencias.forEach(({campo, label, otros, totalOtros}) => {
       const bloqueEntidad = document.createElement("div");
       bloqueEntidad.style.cssText = "margin-top:14px; padding-top:14px; border-top:1px solid var(--border);";
@@ -1821,11 +1847,12 @@
       bloqueEntidad.appendChild(titulo);
 
       otros.forEach(o => {
+        paso++;
         const fila = document.createElement("div");
         fila.style.cssText = "margin-bottom:10px; padding:10px; border-radius:8px; background:var(--page);";
         const encabezado = document.createElement("p");
         encabezado.style.cssText = "margin:0 0 6px; font-size:0.85rem; color:var(--text-sec);";
-        encabezado.textContent = `${o.fecha} — "${o.titulo || "(sin título)"}"`;
+        encabezado.textContent = `Paso ${paso} — ${o.fecha} — "${o.titulo || "(sin título)"}"`;
         fila.appendChild(encabezado);
 
         const significado = obtenerSignificado(campo, label, o.id);
@@ -1868,6 +1895,7 @@
     document.getElementById("bloque-prompt").style.display = "block";
     document.getElementById("bloque-respuesta").style.display = "block";
     renderCoincidencias(seleccionActual);
+    document.getElementById("hint-prompt-generado").style.display = obtenerCoincidencias(seleccionActual).length ? "block" : "none";
 
     const titulos = seleccionActual.map(s => `${s.titulo || "(sin título)"} — ${s.fecha}`);
     const MAX_MOSTRADOS = 3;
@@ -1923,6 +1951,7 @@
     document.getElementById("bloque-respuesta").style.display = "none";
     document.getElementById("resumen-seleccion-prompt").style.display = "none";
     document.getElementById("panel-coincidencias").style.display = "none";
+    document.getElementById("hint-prompt-generado").style.display = "none";
     actualizarPreviewSeleccion();
     renderHistorialInterpretaciones();
     alert("Interpretación guardada.");
