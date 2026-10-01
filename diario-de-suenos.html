@@ -967,7 +967,7 @@
     document.getElementById("hint-diccionario-simbolo").style.display = "none";
     document.getElementById("sugerencias-simbolos-relato").innerHTML = "";
     ["personas","lugares","simbolos"].forEach(f => { document.getElementById("sugerencia-alias-" + f).innerHTML = ""; });
-    dictadosRegistrados.forEach(estado => { if (estado.recognizing && estado.recognition) estado.recognition.stop(); });
+    dictadosRegistrados.forEach(estado => { if (estado.activo) detenerDictado(estado); });
   }
 
   document.getElementById("btn-cancelar-edicion").addEventListener("click", () => { resetForm(); });
@@ -1344,7 +1344,7 @@
     document.getElementById("hint-diccionario-simbolo").style.display = "none";
     document.getElementById("sugerencias-simbolos-relato").innerHTML = "";
     ["personas","lugares","simbolos"].forEach(f => { document.getElementById("sugerencia-alias-" + f).innerHTML = ""; });
-    dictadosRegistrados.forEach(estado => { if (estado.recognizing && estado.recognition) estado.recognition.stop(); });
+    dictadosRegistrados.forEach(estado => { if (estado.activo) detenerDictado(estado); });
     activarTab("nuevo");
   }
 
@@ -2461,10 +2461,13 @@
       return;
     }
     sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    sb.auth.onAuthStateChange((_event, session) => {
+    sb.auth.onAuthStateChange((event, session) => {
       sesionActual = session;
       actualizarUICuenta();
       if (session) ocultarGateCuenta();
+      // Al abrir la app con sesión o al iniciar sesión, traer lo de la nube (fusionando, nunca reemplazando).
+      // setTimeout: Supabase desaconseja hacer consultas dentro de este callback (puede trabarse).
+      if (session && (event === "INITIAL_SESSION" || event === "SIGNED_IN")) setTimeout(sincronizarDesdeNube, 0);
     });
     sb.auth.getSession().then(({ data }) => {
       sesionActual = data.session;
@@ -2533,6 +2536,22 @@
     if (!sb || !sesionActual) return;
     const resultado = await guardarDatosEnNube(idAEliminarDeNube);
     if (!resultado.ok) console.warn("Guardado automático en la nube falló:", resultado.mensaje);
+  }
+
+  async function sincronizarDesdeNube() {
+    if (!sb || !sesionActual) return;
+    try {
+      const { data, error } = await sb.from("datos_usuario")
+        .select("datos").eq("user_id", sesionActual.user.id).maybeSingle();
+      if (error) { console.warn("Sincronización automática desde la nube falló:", error.message); return; }
+      if (!data || !data.datos || !Array.isArray(data.datos.suenos)) return;
+      fusionarEstadoImportado(data.datos, false);
+      localStorage.setItem(CLOUD_DOWNLOAD_KEY, new Date().toISOString());
+      renderBackup();
+      actualizarUICuenta();
+    } catch (e) {
+      console.warn("Sincronización automática desde la nube falló:", e);
+    }
   }
 
   async function descargarDeNube() {
@@ -2850,15 +2869,23 @@
     const btn = document.getElementById(btnId);
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) { btn.style.display = "none"; return; }
-    const estado = { recognizing: false, recognition: null };
+    // "activo" = el usuario quiere seguir dictando. Chrome en Android corta el reconocimiento
+    // ante cualquier silencio de unos segundos (aunque se pida continuous), así que mientras
+    // esté activo se relanza solo en onend; solo el botón Detener (o salir del formulario) lo apaga.
+    const estado = { recognizing: false, recognition: null, activo: false };
     dictadosRegistrados.push(estado);
     btn.addEventListener("click", () => {
+      if (estado.activo) { detenerDictado(estado); return; }
+      estado.activo = true;
+      iniciar();
+    });
+    function iniciar() {
       const textarea = document.getElementById(textareaId);
-      if (estado.recognizing && estado.recognition) { estado.recognition.stop(); return; }
       const recognition = new SpeechRec();
       estado.recognition = recognition;
       recognition.lang = "es-AR";
-      recognition.continuous = true;
+      // continuous=false + relanzar es más confiable en Android, donde continuous=true duplica frases.
+      recognition.continuous = false;
       recognition.interimResults = false;
       recognition.onresult = (e) => {
         let texto = "";
@@ -2873,12 +2900,26 @@
         window.parent.postMessage({ tipo: "diario-suenos-dictado", activo: true }, "*");
       };
       recognition.onend = () => {
-        estado.recognizing = false; btn.textContent = "🎤 Dictar por voz"; btn.classList.remove("grabando");
+        estado.recognizing = false;
+        // Silencio o fin de frase: si el usuario no tocó Detener, seguir escuchando sin cambiar el botón.
+        if (estado.activo) { setTimeout(() => { if (estado.activo) iniciar(); }, 250); return; }
+        btn.textContent = "🎤 Dictar por voz"; btn.classList.remove("grabando");
         window.parent.postMessage({ tipo: "diario-suenos-dictado", activo: false }, "*");
       };
-      recognition.onerror = (e) => { console.error("Error de dictado:", e.error); };
-      recognition.start();
-    });
+      recognition.onerror = (e) => {
+        // "no-speech"/"aborted" son silencios normales: onend lo relanza. El resto no se arregla reintentando.
+        if (e.error === "no-speech" || e.error === "aborted") return;
+        console.error("Error de dictado:", e.error);
+        estado.activo = false;
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") alert("El navegador no tiene permiso para usar el micrófono.");
+        else if (e.error === "network") alert("El dictado necesita conexión a internet.");
+      };
+      try { recognition.start(); } catch (err) { estado.activo = false; console.error("No se pudo iniciar el dictado:", err); recognition.onend(); }
+    }
+  }
+  function detenerDictado(estado) {
+    estado.activo = false;
+    if (estado.recognition) estado.recognition.stop();
   }
   habilitarDictado("btn-dictar-texto", "campo-texto");
   habilitarDictado("btn-dictar-contexto", "campo-contexto-reciente");
