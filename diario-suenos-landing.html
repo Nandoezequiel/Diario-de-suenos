@@ -1380,7 +1380,7 @@ function goToApp() {
 
   // Empieza a cargar la app ya mismo, para que esté lista quando el
   // destello termine de cubrir la pantalla.
-  appFrame.src = "diario-de-suenos.html";
+  appFrame.src = "diario-de-suenos.html?v=" + Date.now(); // evita que el navegador muestre una versión vieja de la app
 
   const maxDim = Math.max(window.innerWidth, window.innerHeight);
   const escalaFinal = (maxDim * 2.2) / 20; // el círculo arranca en 20px
