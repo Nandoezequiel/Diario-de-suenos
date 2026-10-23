@@ -492,16 +492,36 @@
   <section class="tab-panel" id="tab-interpretar">
     <div class="card">
       <h2>Generar prompt para interpretar con IA</h2>
-      <p class="hint">Elegí qué sueños incluir. Se arma un texto listo para pegar en Claude (u otra IA) pidiendo una lectura reflexiva, no un diagnóstico.</p>
+      <p class="hint">Elegí qué sueños incluir. Se arma un texto listo para pegar en ChatGPT (u otra IA) pidiendo una lectura reflexiva, no un diagnóstico.</p>
+
+      <details class="session" style="margin-bottom:12px;">
+        <summary>💡 Recomendado: que la IA lea todo tu diario (ChatGPT gratis)</summary>
+        <ol style="margin:8px 0; padding-left:20px; font-size:0.9rem; color:var(--text-sec);">
+          <li>En ChatGPT, creá un <b>Proyecto</b> llamado "Diario de Sueños" (menú de la izquierda → Nuevo proyecto).</li>
+          <li>En las <b>instrucciones</b> del proyecto, pegá el texto de abajo (una sola vez).</li>
+          <li>Descargá tu diario con el botón de abajo y subilo como <b>archivo</b> del proyecto. Cada tanto (por ejemplo, una vez por semana) borrá el archivo viejo y subí el nuevo.</li>
+          <li>Para cada sueño: generá el prompt acá, abrí un chat nuevo <b>dentro del proyecto</b> y pegalo. La IA va a tener en cuenta todos tus sueños e interpretaciones anteriores.</li>
+        </ol>
+        <textarea id="instrucciones-proyecto" rows="6" readonly></textarea>
+        <div class="btn-row">
+          <button class="btn secondary small" id="btn-copiar-instrucciones">Copiar instrucciones</button>
+          <button class="btn secondary small" id="btn-descargar-diario-ia">Descargar mi diario para la IA</button>
+        </div>
+      </details>
 
       <div class="field">
         <label class="field-label">¿Qué sueños incluir?</label>
         <select id="select-rango-interpretar">
+          <option value="uno">Un sueño puntual</option>
           <option value="sin_interpretar">Sueños que todavía no interpreté</option>
           <option value="ultimos_dias">Últimos N días</option>
           <option value="rango_fechas">Rango de fechas</option>
           <option value="todos">Todos los sueños</option>
         </select>
+      </div>
+      <div class="field" id="opciones-uno">
+        <label class="field-label">Sueño</label>
+        <select id="select-sueno-interpretar"></select>
       </div>
       <div class="row" id="opciones-ultimos-dias" style="display:none;">
         <div class="field">
@@ -532,7 +552,6 @@
 
       <div class="field" id="bloque-prompt" style="margin-top:12px; display:none;">
         <label class="field-label">Prompt generado</label>
-        <p class="hint" id="hint-prompt-generado" style="display:none; margin:-4px 0 8px;">Pegá esto como el último mensaje del mismo chat donde ya hablaste de las coincidencias de arriba (Paso 1, 2, 3...), no en un chat nuevo.</p>
         <textarea id="prompt-generado" rows="10" readonly></textarea>
         <div class="btn-row">
           <button class="btn secondary" id="btn-copiar-prompt">Copiar al portapapeles</button>
@@ -727,7 +746,7 @@
   // ---------- Navegación por pestañas ----------
   const tabButtons = document.querySelectorAll("nav.tabs button");
   tabButtons.forEach(btn => {
-    btn.addEventListener("click", () => { idInterpretacionForzada = null; activarTab(btn.dataset.tab); });
+    btn.addEventListener("click", () => activarTab(btn.dataset.tab));
   });
   function activarTab(tab) {
     tabButtons.forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
@@ -737,7 +756,7 @@
     if (tab === "lista") renderLista();
     if (tab === "mapa") renderMapa();
     if (tab === "conexiones") renderChipsTopTags();
-    if (tab === "interpretar") { actualizarPreviewSeleccion(); renderHistorialInterpretaciones(); }
+    if (tab === "interpretar") { poblarSelectSueno(); mostrarOpcionesRango(); actualizarPreviewSeleccion(); renderHistorialInterpretaciones(); }
     if (tab === "backup") renderBackup();
     if (tab === "cuenta") actualizarUICuenta();
   }
@@ -1705,24 +1724,45 @@
 
   // ---------- Interpretar ----------
   const selectRango = document.getElementById("select-rango-interpretar");
-  let idInterpretacionForzada = null;
-  selectRango.addEventListener("change", () => {
-    idInterpretacionForzada = null;
+  const selectSueno = document.getElementById("select-sueno-interpretar");
+  function mostrarOpcionesRango() {
+    document.getElementById("opciones-uno").style.display = selectRango.value === "uno" ? "block" : "none";
     document.getElementById("opciones-ultimos-dias").style.display = selectRango.value === "ultimos_dias" ? "flex" : "none";
     document.getElementById("opciones-rango-fechas").style.display = selectRango.value === "rango_fechas" ? "flex" : "none";
+  }
+  // Cualquier cambio de selección invalida el prompt ya generado: si no, "Guardar
+  // interpretación" la asociaba a los sueños de la selección anterior.
+  function alCambiarSeleccion() {
+    mostrarOpcionesRango();
+    seleccionActual = [];
+    ["bloque-prompt", "bloque-respuesta", "resumen-seleccion-prompt", "panel-coincidencias"]
+      .forEach(id => { document.getElementById(id).style.display = "none"; });
     actualizarPreviewSeleccion();
-  });
-  document.getElementById("campo-ultimos-dias").addEventListener("input", actualizarPreviewSeleccion);
-  document.getElementById("campo-rango-desde").addEventListener("input", actualizarPreviewSeleccion);
-  document.getElementById("campo-rango-hasta").addEventListener("input", actualizarPreviewSeleccion);
+  }
+  [selectRango, selectSueno].forEach(el => el.addEventListener("change", alCambiarSeleccion));
+  ["campo-ultimos-dias", "campo-rango-desde", "campo-rango-hasta"]
+    .forEach(id => document.getElementById(id).addEventListener("input", alCambiarSeleccion));
+
+  // Sin interpretar primero (más nuevos arriba), después los ya interpretados.
+  function poblarSelectSueno() {
+    const previo = selectSueno.value;
+    const orden = [...state.suenos].sort((a,b) => (a.interpretado ? 1 : 0) - (b.interpretado ? 1 : 0) || b.fecha.localeCompare(a.fecha));
+    selectSueno.innerHTML = "";
+    orden.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = `${s.interpretado ? "✓ " : ""}${s.fecha} — ${s.titulo || "(sin título)"}`;
+      selectSueno.appendChild(opt);
+    });
+    if (orden.some(s => s.id === previo)) selectSueno.value = previo;
+  }
 
   function suenosSeleccionados() {
-    if (idInterpretacionForzada) {
-      return state.suenos.filter(s => s.id === idInterpretacionForzada);
-    }
     const modo = selectRango.value;
     let lista = [...state.suenos];
-    if (modo === "sin_interpretar") {
+    if (modo === "uno") {
+      lista = lista.filter(s => s.id === selectSueno.value);
+    } else if (modo === "sin_interpretar") {
       lista = lista.filter(s => !s.interpretado);
     } else if (modo === "ultimos_dias") {
       const dias = Number(document.getElementById("campo-ultimos-dias").value) || 30;
@@ -1740,15 +1780,13 @@
 
   function actualizarPreviewSeleccion() {
     const p = document.getElementById("preview-seleccion");
-    if (idInterpretacionForzada) {
-      const s = state.suenos.find(x => x.id === idInterpretacionForzada);
-      p.textContent = s ? `Vas a interpretar solo este sueño: ${s.fecha} — ${s.titulo || "(sin título)"}.` : "Ese sueño ya no existe.";
-      return;
-    }
     const sel = suenosSeleccionados();
-    p.textContent = sel.length
-      ? `Se incluirán ${sel.length} sueño(s): ` + sel.map(s => s.fecha).join(", ")
-      : "No hay sueños que coincidan con esta selección.";
+    p.textContent = !sel.length
+      ? "No hay sueños que coincidan con esta selección."
+      : selectRango.value === "uno"
+        ? (sel[0].interpretado ? "Este sueño ya tiene una interpretación guardada; podés agregar otra." : "")
+        : `Se incluirán ${sel.length} sueño(s): ` + sel.map(s => s.fecha).join(", ") +
+          (sel.length > 1 ? ". Juntos conviene solo si son de la misma noche o querés ver un patrón; si no, interpretalos de a uno." : "");
   }
 
   function tagsRelacionados(tagA, tagB) {
@@ -1873,22 +1911,26 @@
     return bloques;
   }
 
+  const INSTRUCCIONES_INTERPRETACION =
+    "Actuá como un acompañante reflexivo para interpretar sueños (no como profesional clínico ni para diagnóstico médico o psicológico). " +
+    "Te paso un registro de sueños que anoté. Quiero que me ayudes a:\n" +
+    "1. Identificar símbolos, personas, lugares o emociones que se repiten entre estos sueños (mencionalos brevemente, no hace falta un párrafo dedicado a cada uno).\n" +
+    "2. Priorizar profundidad sobre cobertura: en vez de analizar cada persona/lugar/símbolo por separado y de forma pareja, elegí los 1 a 3 hilos que consideres realmente significativos de este sueño (no necesariamente los más obvios ni los que tengan la asociación de diccionario de sueños más conocida) y desarrollalos en profundidad, conectándolos entre sí y con mi vida despierta o estado emocional reciente de forma concreta y específica a mi situación — no una lectura genérica que podría aplicarle a cualquier persona con ese mismo símbolo.\n" +
+    "3. Ofrecer una interpretación reflexiva y respetuosa, sin afirmaciones absolutas ni alarmistas, que arriesgue una lectura o hipótesis concreta en vez de listar posibilidades — algo que me aporte una perspectiva que no vería solo con releer mi propio relato, no una reformulación de lo que ya escribí con otras palabras.\n" +
+    "4. Sugerir 2 o 3 preguntas para que yo mismo siga explorando estos patrones.\n" +
+    "5. Usar mi historial: si tenés acceso a un archivo con mi diario completo (sueños e interpretaciones anteriores) o te doy contexto de continuidad, buscá ahí los sueños donde aparecieron los mismos símbolos, personas o lugares y fijate si el significado se mantiene, cambia o se refuerza con el tiempo, en vez de interpretar cada aparición de forma aislada. Mencioná brevemente qué sueños anteriores tuviste en cuenta.\n\n" +
+    "Aclaración: esto es para autoconocimiento personal, no reemplaza terapia ni diagnóstico psicológico.\n\n";
+  document.getElementById("instrucciones-proyecto").value = INSTRUCCIONES_INTERPRETACION.trim();
+
   function generarPrompt(sel) {
-    let txt = "Actuá como un acompañante reflexivo para interpretar sueños (no como profesional clínico ni para diagnóstico médico o psicológico). ";
-    txt += "Te paso un registro de sueños que anoté. Quiero que me ayudes a:\n";
-    txt += "1. Identificar símbolos, personas, lugares o emociones que se repiten entre estos sueños (mencionalos brevemente, no hace falta un párrafo dedicado a cada uno).\n";
-    txt += "2. Priorizar profundidad sobre cobertura: en vez de analizar cada persona/lugar/símbolo por separado y de forma pareja, elegí los 1 a 3 hilos que consideres realmente significativos de este sueño (no necesariamente los más obvios ni los que tengan la asociación de diccionario de sueños más conocida) y desarrollalos en profundidad, conectándolos entre sí y con mi vida despierta o estado emocional reciente de forma concreta y específica a mi situación — no una lectura genérica que podría aplicarle a cualquier persona con ese mismo símbolo.\n";
-    txt += "3. Ofrecer una interpretación reflexiva y respetuosa, sin afirmaciones absolutas ni alarmistas, que arriesgue una lectura o hipótesis concreta en vez de listar posibilidades — algo que me aporte una perspectiva que no vería solo con releer mi propio relato, no una reformulación de lo que ya escribí con otras palabras.\n";
-    txt += "4. Sugerir 2 o 3 preguntas para que yo mismo siga explorando estos patrones.\n";
-    txt += "5. Si te doy contexto de continuidad de otros sueños donde aparecieron los mismos símbolos, personas o lugares, usalo: fijate si el significado se mantiene, cambia o se refuerza con el tiempo, en vez de interpretar cada aparición de forma aislada.\n\n";
-    txt += "Aclaración: esto es para autoconocimiento personal, no reemplaza terapia ni diagnóstico psicológico.\n\n";
+    let txt = INSTRUCCIONES_INTERPRETACION;
     if (state.contextoPersonal && state.contextoPersonal.trim()) {
       txt += `Contexto personal sobre mí (dato de fondo, no es parte de un sueño puntual): ${state.contextoPersonal.trim()}\n\n`;
     }
     const continuidad = generarContextoContinuidad(sel);
     if (continuidad.length) {
       txt += "--- Contexto de continuidad (elementos que se repiten en otros sueños ya registrados) ---\n\n";
-      txt += "Nota: si en ESTA MISMA conversación ya te pregunté antes por el significado de alguno de estos elementos repetidos (te pasé el relato de un sueño anterior y te pedí que me dijeras qué significaba puntualmente ahí), ya tenés esa respuesta tuya en el historial de este chat — priorizala como el contexto más confiable. Para lo que no te haya preguntado todavía en esta conversación, usá lo que te doy a continuación, y si dice que el significado no está definido, no lo inventes.\n\n";
+      txt += "Nota: si en ESTA MISMA conversación ya te pregunté antes por el significado de alguno de estos elementos repetidos, priorizá esa respuesta tuya. Si tenés el archivo de mi diario, leé ahí el relato completo de esos sueños anteriores. Si algo dice que el significado no está definido y no tenés con qué deducirlo, no lo inventes.\n\n";
       txt += continuidad.join("\n");
       txt += "\n";
     }
@@ -2043,15 +2085,22 @@
   function renderCoincidencias(sel) {
     const cont = document.getElementById("panel-coincidencias");
     const coincidencias = obtenerCoincidencias(sel);
+    const estabaAbierto = !!cont.querySelector("details[open]");
     cont.innerHTML = "";
     if (!coincidencias.length) { cont.style.display = "none"; return; }
     cont.style.display = "block";
 
-    const card = document.createElement("div");
+    const card = document.createElement("details");
     card.className = "card";
-    const h3 = document.createElement("h3");
-    h3.textContent = "Coincidencias con sueños anteriores";
+    card.open = estabaAbierto;
+    const h3 = document.createElement("summary");
+    h3.style.cssText = "cursor:pointer; font-weight:600;";
+    h3.textContent = `Opcional: precisar ${coincidencias.length} coincidencia(s) con sueños anteriores, una por una`;
     card.appendChild(h3);
+    const pOpcional = document.createElement("p");
+    pOpcional.className = "hint";
+    pOpcional.textContent = "Si usás el proyecto de ChatGPT con tu diario cargado, no hace falta: la IA ya ve los sueños anteriores. Esto sirve para dejar guardado qué significó algo puntual.";
+    card.appendChild(pOpcional);
 
     const instrucciones = document.createElement("div");
     instrucciones.style.cssText = "background:var(--page); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:8px 0 4px;";
@@ -2158,7 +2207,6 @@
     document.getElementById("bloque-prompt").style.display = "block";
     document.getElementById("bloque-respuesta").style.display = "block";
     renderCoincidencias(seleccionActual);
-    document.getElementById("hint-prompt-generado").style.display = obtenerCoincidencias(seleccionActual).length ? "block" : "none";
 
     const titulos = seleccionActual.map(s => `${s.titulo || "(sin título)"} — ${s.fecha}`);
     const MAX_MOSTRADOS = 3;
@@ -2173,15 +2221,19 @@
   document.getElementById("btn-generar-prompt").addEventListener("click", generarYMostrarPrompt);
 
   function abrirInterpretarParaSueno(id) {
-    idInterpretacionForzada = id;
     activarTab("interpretar");
+    selectRango.value = "uno";
+    selectSueno.value = id;
+    alCambiarSeleccion();
     generarYMostrarPrompt();
   }
-  document.getElementById("btn-copiar-prompt").addEventListener("click", async () => {
-    const ta = document.getElementById("prompt-generado");
+  document.getElementById("btn-copiar-instrucciones").addEventListener("click", () =>
+    copiarConAviso(document.getElementById("instrucciones-proyecto"), document.getElementById("btn-copiar-instrucciones")));
+  document.getElementById("btn-descargar-diario-ia").addEventListener("click", () =>
+    downloadFile(`diario-suenos-para-ia-${todayStr()}.md`, generarMarkdownDiario(), "text/markdown"));
+  async function copiarConAviso(ta, btn) {
     try {
       await navigator.clipboard.writeText(ta.value);
-      const btn = document.getElementById("btn-copiar-prompt");
       const original = btn.textContent;
       btn.textContent = "¡Copiado!";
       setTimeout(() => { btn.textContent = original; }, 1500);
@@ -2189,7 +2241,9 @@
       ta.select();
       document.execCommand("copy");
     }
-  });
+  }
+  document.getElementById("btn-copiar-prompt").addEventListener("click", () =>
+    copiarConAviso(document.getElementById("prompt-generado"), document.getElementById("btn-copiar-prompt")));
   document.getElementById("btn-guardar-interpretacion").addEventListener("click", () => {
     const respuesta = document.getElementById("respuesta-ia").value.trim();
     if (!seleccionActual.length) { alert("Primero generá un prompt."); return; }
@@ -2208,14 +2262,10 @@
     });
     guardarEstado();
     guardarEnNubeSilencioso();
-    idInterpretacionForzada = null;
     document.getElementById("respuesta-ia").value = "";
-    document.getElementById("bloque-prompt").style.display = "none";
-    document.getElementById("bloque-respuesta").style.display = "none";
-    document.getElementById("resumen-seleccion-prompt").style.display = "none";
-    document.getElementById("panel-coincidencias").style.display = "none";
-    document.getElementById("hint-prompt-generado").style.display = "none";
-    actualizarPreviewSeleccion();
+    selectSueno.innerHTML = ""; // así poblarSelectSueno salta al próximo sin interpretar
+    poblarSelectSueno();
+    alCambiarSeleccion();
     renderHistorialInterpretaciones();
     alert("Interpretación guardada.");
   });
@@ -2235,7 +2285,7 @@
       const det = document.createElement("details");
       det.className = "session";
       const sum = document.createElement("summary");
-      sum.textContent = `${new Date(sesion.fecha).toLocaleDateString("es-AR")} — ${(sesion.suenosIds||[]).length} sueño(s)`;
+      sum.textContent = `${new Date(sesion.fecha).toLocaleDateString("es-AR")} — ${titulosDeSuenos(sesion.suenosIds)}`;
       const resp = document.createElement("div");
       resp.className = "respuesta";
       resp.textContent = sesion.respuesta || "(sin respuesta guardada)";
@@ -2295,7 +2345,37 @@
     renderBackup();
   });
 
+  function titulosDeSuenos(ids) {
+    const titulos = (ids||[]).map(id => state.suenos.find(s => s.id === id)).filter(Boolean)
+      .map(s => `${s.fecha} "${s.titulo || "(sin título)"}"`);
+    return titulos.length ? titulos.join(" · ") : `${(ids||[]).length} sueño(s)`;
+  }
+
+  // Las claves de significados son "campo::etiqueta[::suenoId]" (ver claveSignificado).
+  function markdownSignificados() {
+    let md = "";
+    const generales = Object.entries(state.significadosGenerales || {});
+    const puntuales = Object.entries(state.significadosEntidad || {});
+    if (!generales.length && !puntuales.length) return md;
+    md += "# Significados que ya definí para elementos que se repiten\n\n";
+    generales.forEach(([clave, v]) => {
+      const [campo, etiqueta] = clave.split("::");
+      md += `- **${etiqueta}** (${CAMPO_LABEL[campo]||campo}, en general): ${v.texto}\n`;
+    });
+    puntuales.forEach(([clave, v]) => {
+      const [campo, etiqueta, suenoId] = clave.split("::");
+      md += `- **${etiqueta}** (${CAMPO_LABEL[campo]||campo}) en ${titulosDeSuenos([suenoId])}: ${v.texto}\n`;
+    });
+    return md + "\n---\n\n";
+  }
+
   document.getElementById("btn-exportar-md").addEventListener("click", () => {
+    downloadFile(`diario-suenos-${todayStr()}.md`, generarMarkdownDiario(), "text/markdown");
+    localStorage.setItem(BACKUP_KEY, new Date().toISOString());
+    renderBackup();
+  });
+
+  function generarMarkdownDiario() {
     const ordenados = [...state.suenos].sort((a,b) => a.fecha.localeCompare(b.fecha));
     let md = `# Diario de Sueños\n\nExportado el ${new Date().toLocaleString("es-AR")}\n\n`;
     if (state.contextoPersonal && state.contextoPersonal.trim()) {
@@ -2313,16 +2393,15 @@
       if (s.notas) md += `**Notas al despertar:** ${s.notas}\n\n`;
       md += "---\n\n";
     });
+    md += markdownSignificados();
     if (state.interpretaciones.length) {
       md += "# Interpretaciones guardadas\n\n";
       [...state.interpretaciones].sort((a,b) => a.fecha.localeCompare(b.fecha)).forEach(it => {
-        md += `## Sesión del ${new Date(it.fecha).toLocaleDateString("es-AR")}\n\n${it.respuesta || "(sin respuesta guardada)"}\n\n---\n\n`;
+        md += `## Sesión del ${new Date(it.fecha).toLocaleDateString("es-AR")} — ${titulosDeSuenos(it.suenosIds)}\n\n${it.respuesta || "(sin respuesta guardada)"}\n\n---\n\n`;
       });
     }
-    downloadFile(`diario-suenos-${todayStr()}.md`, md, "text/markdown");
-    localStorage.setItem(BACKUP_KEY, new Date().toISOString());
-    renderBackup();
-  });
+    return md;
+  }
 
   function fusionarEstadoImportado(parsed, reemplazar) {
     if (reemplazar) {
